@@ -70,24 +70,41 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
       return;
     }
 
-    const batch = writeBatch(db);
-    const collectionRef = collection(db, collectionName);
-    const timestamp = new Date();
-    
-    data.forEach((item) => {
-      const docRef = doc(collectionRef);
-      const itemWithTimestamp = {
-        ...item,
-        createdAt: timestamp,
-        updatedAt: timestamp
-      };
-      batch.set(docRef, itemWithTimestamp);
-    });
+    try {
+      const batch = writeBatch(db);
+      const collectionRef = collection(db, collectionName);
+      const timestamp = new Date();
+      
+      console.log(`Uploading ${data.length} documents to ${collectionName}...`);
+      
+      data.forEach((item, index) => {
+        const docRef = doc(collectionRef);
+        // Add timestamp with millisecond offset for proper ordering
+        const itemWithTimestamp = {
+          ...item,
+          createdAt: new Date(timestamp.getTime() + index),
+          updatedAt: new Date(timestamp.getTime() + index)
+        };
+        batch.set(docRef, itemWithTimestamp);
+        console.log(`Document ${index + 1}:`, itemWithTimestamp);
+      });
 
-    await batch.commit();
-    toast.success(`Successfully uploaded ${data.length} documents`);
-    setPastedText('');
-    onClose();
+      await batch.commit();
+      console.log(`✅ Successfully uploaded ${data.length} documents to ${collectionName}`);
+      toast.success(`Successfully uploaded ${data.length} documents to ${collectionName}`);
+      setPastedText('');
+      onClose();
+    } catch (error) {
+      console.error('❌ Bulk upload error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
+      if (error.code === 'permission-denied') {
+        toast.error(`Permission denied! Please update Firebase security rules to allow writes. See /app/FIREBASE_SETUP.md`);
+      } else {
+        toast.error(`Upload failed: ${error.message}`);
+      }
+    }
   };
 
   const handleFileUpload = async (file) => {
