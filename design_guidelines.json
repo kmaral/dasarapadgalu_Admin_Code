@@ -1,0 +1,133 @@
+{
+  "theme_and_archetype": {
+    "domain": "Data Management Dashboard / Admin Panel",
+    "theme": "Light",
+    "archetype": "Archetype 4 (Swiss & High-Contrast)",
+    "rationale": "For an admin dashboard handling large data sets (Firebase collections), clarity and authority are paramount. This archetype uses strict grids, stark contrasts, and prioritizes data legibility over decorative flair.",
+    "emotional_tone": "Objective, rigid, functional, professional, and efficient."
+  },
+  "typography": {
+    "strategy": "Swiss Brutalist",
+    "fonts": {
+      "headings": {
+        "family": "Chivo, sans-serif",
+        "weights": ["400", "700", "900"],
+        "usage": "Use tight letter spacing (tracking-tight) for all headers > 24px."
+      },
+      "body": {
+        "family": "IBM Plex Sans, sans-serif",
+        "weights": ["400", "500", "600"],
+        "usage": "Clean, highly legible monospace-adjacent font for data tables and dense UI elements."
+      },
+      "mono": {
+        "family": "IBM Plex Mono, monospace",
+        "weights": ["400"],
+        "usage": "Use for IDs, Firebase document references, code snippets, or raw JSON views."
+      }
+    },
+    "hierarchy": {
+      "h1": "text-4xl tracking-tighter font-black text-zinc-950",
+      "h2": "text-2xl tracking-tight font-bold text-zinc-900",
+      "h3": "text-xl tracking-tight font-semibold text-zinc-900",
+      "body": "text-sm text-zinc-700 leading-relaxed",
+      "labels": "text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500",
+      "table_data": "text-sm text-zinc-800"
+    }
+  },
+  "color_palette": {
+    "base": {
+      "background": "#FFFFFF",
+      "surface": "#F4F4F5",
+      "surface_hover": "#E4E4E7"
+    },
+    "text": {
+      "primary": "#09090B",
+      "secondary": "#52525B",
+      "muted": "#A1A1AA"
+    },
+    "brand_accent": {
+      "primary": "#002FA7",
+      "primary_hover": "#002277",
+      "text_on_primary": "#FFFFFF"
+    },
+    "status": {
+      "success": "#16A34A",
+      "error": "#DC2626",
+      "warning": "#EAB308",
+      "info": "#2563EB"
+    },
+    "borders": {
+      "default": "#E4E4E7",
+      "focus": "#002FA7"
+    },
+    "rules": {
+      "gradients": "Forbidden. Use flat, solid colors.",
+      "shadows": "Minimal. Rely on 1px solid borders (#E4E4E7) to define structure, not soft shadows. 'Grid Borders' approach preferred.",
+      "contrast": "Ensure minimum 4.5:1 ratio for text. Always define hover states (e.g., hover:bg-zinc-100 hover:text-zinc-900)."
+    }
+  },
+  "spacing_and_layout": {
+    "grid_system": "MODE B: THE 'CONTROL ROOM' GRID",
+    "spacing_scale": "Tailwind standard (p-4, p-6, p-8). Use tight gaps (gap-4 or gap-6) for widget density.",
+    "layout_structure": {
+      "sidebar": "w-64 fixed h-screen border-r border-zinc-200 bg-zinc-50 flex flex-col",
+      "main_content": "ml-64 flex-1 min-h-screen bg-white",
+      "header": "h-16 border-b border-zinc-200 px-8 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-40"
+    },
+    "container_styling": {
+      "cards": "bg-white border border-zinc-200 rounded-none md:rounded-sm",
+      "tables": "w-full border-collapse text-left text-sm"
+    }
+  },
+  "component_rules": {
+    "buttons": {
+      "primary": "bg-[#002FA7] text-white hover:bg-[#002277] rounded-none px-6 py-2 font-medium transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-[#002FA7]",
+      "secondary": "bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-none px-6 py-2 transition-colors",
+      "destructive": "bg-red-600 text-white hover:bg-red-700 rounded-none"
+    },
+    "tables": {
+      "usage": "Use Shadcn Table. Implement sortable column headers and sticky headers if data is long. Row hover states must be distinct (hover:bg-zinc-50). Add a checkbox column for bulk actions.",
+      "actions": "Place an 'Actions' dropdown (Shadcn Dropdown Menu) at the end of each row for Edit/Delete."
+    },
+    "forms_and_inputs": {
+      "inputs": "Shadcn Input. Rounded-none, border-zinc-300 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7].",
+      "dialogs": "Use Shadcn Sheet (Slide-over from right) for creating/editing documents to keep the table in context, or Dialog for simple confirmations.",
+      "bulk_upload": "A dedicated drag-and-drop zone with border-2 border-dashed border-zinc-300 bg-zinc-50 hover:bg-zinc-100 transition-colors py-12 text-center."
+    },
+    "notifications": {
+      "usage": "Use Sonner for real-time Firebase sync notifications. Position bottom-right."
+    },
+    "icons": {
+      "library": "lucide-react (default) or @phosphor-icons/react for sharper, high-end data icons."
+    }
+  },
+  "interaction_and_motion": {
+    "hover_states": "All interactive elements must have a visible hover state altering background color or border. No floating or scaling (translate/scale) in this rigid dashboard.",
+    "transitions": "Fast and snappy. duration-150 ease-in-out.",
+    "loading": "Use skeleton loaders (Shadcn Skeleton) mimicking the table structure instead of generic spinners."
+  },
+  "media_urls": {
+    "avatars": {
+      "admin_user": {
+        "url": "https://images.pexels.com/photos/20157010/pexels-photo-20157010.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Professional minimalist portrait for the admin user profile in the header menu."
+      }
+    },
+    "backgrounds": {
+      "auth_page": {
+        "url": "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMG1pbmltYWxpc3QlMjBiYWNrZ3JvdW5kJTIwbGlnaHR8ZW58MHx8fHwxNzgxNDE2NTA0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Subtle abstract wavy light background, to be used if a login/auth page is built before accessing the dashboard."
+      }
+    }
+  },
+  "instructions_to_main_agent": {
+    "1": "Use the Shadcn UI components available in /app/frontend/src/components/ui.",
+    "2": "Override default rounded corners of Shadcn to rounded-none or rounded-sm to maintain the 'Swiss Brutalist' rigid aesthetic.",
+    "3": "Implement a sidebar layout for the Collection Switcher (ArtistCollections, ArtistDetails, CategoryDetails, CategorySubDetails, Languages, SongDetails).",
+    "4": "Integrate Firebase Firestore logic directly with the table. Ensure real-time listeners update the table state automatically.",
+    "5": "For 'Manual Form Entry', build a dynamic form that adjusts based on the selected collection's schema. Open this form inside a Shadcn Sheet or Dialog.",
+    "6": "For 'Bulk Upload', implement a CSV/JSON file parser (like PapaParse) and batch write to Firestore.",
+    "7": "Ensure all interactive elements (Buttons, Table Rows, Nav Links) include a 'data-testid' attribute (e.g., data-testid='sidebar-nav-artist-details').",
+    "8": "Do NOT use generic 'Inter' font. Apply IBM Plex Sans globally for the body and Chivo for headers via Google Fonts."
+  }
+}
