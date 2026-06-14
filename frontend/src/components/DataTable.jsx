@@ -28,6 +28,40 @@ function parseLastTimestamp(value) {
   return new Date(+yyyy, +mm - 1, +dd, +hh, +mi, +ss);
 }
 
+// Per-collection ID field used as the default sort.
+const ID_FIELD_PER_COLLECTION = {
+  SongDetails: 'songid',
+  ArtistDetails: 'artistID',
+  ArtistCollections: 'artistID',
+  CategoryDetails: 'categoryGroupId',
+  CategorySubDetails: 'categoryGroupId',
+  Languages: 'languageID',
+};
+
+const getDefaultSort = (collName) => {
+  const field = ID_FIELD_PER_COLLECTION[collName];
+  return field ? `${field}-desc` : 'id-desc';
+};
+
+// Case/variant-tolerant field lookup on a document.
+// Tries the canonical name and common case variants (camel, Pascal, all-caps).
+const lookupField = (docObj, field) => {
+  if (!field || !docObj) return undefined;
+  if (docObj[field] !== undefined) return docObj[field];
+  const lower = field.toLowerCase();
+  const upper = field.toUpperCase();
+  const pascal = field.charAt(0).toUpperCase() + field.slice(1);
+  for (const k of [lower, upper, pascal]) {
+    if (docObj[k] !== undefined) return docObj[k];
+  }
+  // last resort: scan keys ignoring case
+  const target = lower;
+  for (const k of Object.keys(docObj)) {
+    if (k.toLowerCase() === target) return docObj[k];
+  }
+  return undefined;
+};
+
 const PAGE_SIZE = 50;
 const CELL_TRUNCATE_LEN = 40;
 
@@ -70,9 +104,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
-  const [sortBy, setSortBy] = useState(
-    collectionName === 'SongDetails' ? 'lasttimeStamp-desc' : 'id-desc'
-  );
+  const [sortBy, setSortBy] = useState(getDefaultSort(collectionName));
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -123,7 +155,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
 
   // Reset sort when switching collections
   useEffect(() => {
-    setSortBy(collectionName === 'SongDetails' ? 'lasttimeStamp-desc' : 'id-desc');
+    setSortBy(getDefaultSort(collectionName));
   }, [collectionName]);
 
   // Load initial data with pagination - order by songid desc for SongDetails
@@ -294,18 +326,30 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
 
       // Chronological sort for lasttimeStamp (handles "DD-MM-YYYY HH:MM:SS")
       if (field === 'lasttimeStamp') {
-        const ad = parseLastTimestamp(a[field]);
-        const bd = parseLastTimestamp(b[field]);
+        const ad = parseLastTimestamp(lookupField(a, field));
+        const bd = parseLastTimestamp(lookupField(b, field));
         if (ad && bd) return (ad.getTime() - bd.getTime()) * dir;
         if (ad && !bd) return -1;
         if (!ad && bd) return 1;
         return 0;
       }
 
-      let aVal = a[field];
-      let bVal = b[field];
+      let aVal = field === 'id' ? a.id : lookupField(a, field);
+      let bVal = field === 'id' ? b.id : lookupField(b, field);
+
+      // Coerce numeric strings so "100" > "9" sorts numerically
+      const aNum = typeof aVal === 'number' ? aVal : (typeof aVal === 'string' && /^\d+$/.test(aVal) ? Number(aVal) : null);
+      const bNum = typeof bVal === 'number' ? bVal : (typeof bVal === 'string' && /^\d+$/.test(bVal) ? Number(bVal) : null);
+      if (aNum !== null && bNum !== null) {
+        if (aNum === bNum) return 0;
+        return (aNum > bNum ? 1 : -1) * dir;
+      }
+
       if (typeof aVal === 'string') aVal = aVal.toLowerCase();
       if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      if (aVal === undefined && bVal === undefined) return 0;
+      if (aVal === undefined) return 1;
+      if (bVal === undefined) return -1;
       if (aVal === bVal) return 0;
       return (aVal > bVal ? 1 : -1) * dir;
     });
@@ -430,12 +474,19 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     );
   }
 
-  const sortableColumns = ['id', ...columns.filter(col => 
-    col.toLowerCase().includes('time') || 
-    col.toLowerCase().includes('date') || 
-    col.toLowerCase().includes('created') ||
-    col.toLowerCase().includes('updated')
-  )];
+  const sortableColumns = (() => {
+    const idField = ID_FIELD_PER_COLLECTION[collectionName];
+    const extras = columns.filter(col =>
+      col.toLowerCase().includes('time') ||
+      col.toLowerCase().includes('date') ||
+      col.toLowerCase().includes('created') ||
+      col.toLowerCase().includes('updated')
+    );
+    const ordered = ['id'];
+    if (idField && !ordered.includes(idField)) ordered.push(idField);
+    extras.forEach(c => { if (!ordered.includes(c)) ordered.push(c); });
+    return ordered;
+  })();
 
   return (
     <>
