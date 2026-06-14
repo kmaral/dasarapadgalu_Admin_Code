@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, limit, onSnapshot, deleteDoc, doc, orderBy, startAfter, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, deleteDoc, doc, orderBy, startAfter, getDocs, writeBatch, updateDoc, documentId } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -40,7 +40,10 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     setHasMore(true);
     setLastDoc(null);
     
-    // For SongDetails, order by songid (descending - newest first)
+    // For SongDetails, order by songid (descending - newest first).
+    // For other collections, order by document ID (descending). Using documentId()
+    // guarantees every doc is returned — older docs that may be missing
+    // `createdAt` were being silently filtered out by `orderBy('createdAt')`.
     let q;
     if (collectionName === 'SongDetails') {
       q = query(
@@ -49,10 +52,9 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
         limit(PAGE_SIZE)
       );
     } else {
-      // For other collections, order by createdAt
       q = query(
         collection(db, collectionName),
-        orderBy('createdAt', 'desc'),
+        orderBy(documentId(), 'desc'),
         limit(PAGE_SIZE)
       );
     }
@@ -85,12 +87,11 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       
       setLoading(false);
     }, (error) => {
-      // If index doesn't exist, fall back to createdAt only
+      // If index doesn't exist, fall back to a plain query (Firestore default = doc id asc)
       if (error.code === 'failed-precondition' || error.message.includes('index')) {
-        console.log('Falling back to createdAt ordering');
+        console.log('Falling back to no orderBy');
         const fallbackQuery = query(
           collection(db, collectionName),
-          orderBy('createdAt', 'desc'),
           limit(PAGE_SIZE)
         );
         
@@ -153,7 +154,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       } else {
         q = query(
           collection(db, collectionName),
-          orderBy('createdAt', 'desc'),
+          orderBy(documentId(), 'desc'),
           startAfter(lastDoc),
           limit(PAGE_SIZE)
         );
