@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X, AlertCircle } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X, AlertCircle, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import Fuse from 'fuse.js';
@@ -66,6 +66,8 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [columns, setColumns] = useState([]);
+  const [columnOrder, setColumnOrder] = useState([]);
+  const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
   const [sortBy, setSortBy] = useState(
@@ -77,6 +79,47 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchAlgorithm, setSearchAlgorithm] = useState('advanced'); // 'advanced' or 'fuzzy'
+
+  // Sync column order with current columns. Preserve user's saved order
+  // from localStorage; append any new columns at the end; drop missing ones.
+  useEffect(() => {
+    if (columns.length === 0) {
+      setColumnOrder([]);
+      return;
+    }
+    const storageKey = `columnOrder:${collectionName}`;
+    let saved = null;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) saved = JSON.parse(raw);
+    } catch (e) { /* ignore */ }
+    if (Array.isArray(saved)) {
+      const valid = saved.filter((c) => columns.includes(c));
+      const missing = columns.filter((c) => !valid.includes(c));
+      setColumnOrder([...valid, ...missing]);
+    } else {
+      setColumnOrder(columns);
+    }
+  }, [columns, collectionName]);
+
+  const persistColumnOrder = (order) => {
+    setColumnOrder(order);
+    try {
+      localStorage.setItem(`columnOrder:${collectionName}`, JSON.stringify(order));
+    } catch (e) { /* ignore quota errors */ }
+  };
+
+  const moveColumn = (idx, dir) => {
+    const target = idx + dir;
+    if (target < 0 || target >= columnOrder.length) return;
+    const next = [...columnOrder];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    persistColumnOrder(next);
+  };
+
+  const resetColumnOrder = () => {
+    persistColumnOrder(columns);
+  };
 
   // Reset sort when switching collections
   useEffect(() => {
@@ -131,7 +174,11 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
         docs.forEach(doc => {
           Object.keys(doc).forEach(key => allKeys.add(key));
         });
-        setColumns(Array.from(allKeys).filter(key => key !== 'id'));
+        let cols = Array.from(allKeys).filter(key => key !== 'id');
+        if (collectionName === 'SongDetails') {
+          cols = cols.filter(k => k.toLowerCase() !== 'playcount');
+        }
+        setColumns(cols);
       } else {
         setColumns([]);
       }
@@ -166,7 +213,11 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
             docs.forEach(doc => {
               Object.keys(doc).forEach(key => allKeys.add(key));
             });
-            setColumns(Array.from(allKeys).filter(key => key !== 'id'));
+            let cols = Array.from(allKeys).filter(key => key !== 'id');
+            if (collectionName === 'SongDetails') {
+              cols = cols.filter(k => k.toLowerCase() !== 'playcount');
+            }
+            setColumns(cols);
           } else {
             setColumns([]);
           }
@@ -455,8 +506,70 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
             </Select>
           </div>
           
-          <div className="text-sm text-zinc-600" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-            {searchQuery ? `Showing ${displayDocuments.length} of ${totalCount}` : `Showing ${documents.length} of ${totalCount} documents`}
+          <div className="flex items-center gap-3">
+            <div className="text-sm text-zinc-600" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              {searchQuery ? `Showing ${displayDocuments.length} of ${totalCount}` : `Showing ${documents.length} of ${totalCount} documents`}
+            </div>
+            <Popover open={columnSettingsOpen} onOpenChange={setColumnSettingsOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  data-testid="columns-settings-button"
+                  type="button"
+                  variant="outline"
+                  className="rounded-none h-9 border-zinc-300"
+                  style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+                >
+                  <Settings2 className="w-4 h-4 mr-2" />
+                  Columns
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 max-h-[420px] overflow-auto rounded-sm" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Rearrange columns</div>
+                  <button
+                    type="button"
+                    onClick={resetColumnOrder}
+                    className="text-xs text-[#002FA7] hover:underline"
+                    data-testid="columns-reset"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <ul className="space-y-1">
+                  {columnOrder.map((col, idx) => (
+                    <li
+                      key={col}
+                      data-testid={`column-row-${col}`}
+                      className="flex items-center justify-between gap-2 px-2 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-sm"
+                    >
+                      <span className="text-sm text-zinc-800 truncate">{col}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          data-testid={`column-up-${col}`}
+                          onClick={() => moveColumn(idx, -1)}
+                          disabled={idx === 0}
+                          className="h-6 w-6 inline-flex items-center justify-center text-zinc-600 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label={`Move ${col} up`}
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          data-testid={`column-down-${col}`}
+                          onClick={() => moveColumn(idx, 1)}
+                          disabled={idx === columnOrder.length - 1}
+                          className="h-6 w-6 inline-flex items-center justify-center text-zinc-600 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
+                          aria-label={`Move ${col} down`}
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
       </div>
@@ -466,8 +579,8 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
           <TableHeader>
             <TableRow className="bg-zinc-50 hover:bg-zinc-50">
               <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-0 bg-zinc-50 z-10 w-16 text-center" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>#</TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-16 bg-zinc-50 z-10" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
-              {columns.map((col) => (
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
+              {columnOrder.map((col) => (
                 <TableHead key={col} className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                   {col}
                 </TableHead>
@@ -479,8 +592,8 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
             {displayDocuments.map((doc, index) => (
               <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className="hover:bg-zinc-50">
                 <TableCell className="font-semibold text-sm text-zinc-700 sticky left-0 bg-white z-10 text-center">{index + 1}</TableCell>
-                <TableCell className="font-mono text-xs text-zinc-600 sticky left-16 bg-white z-10">{doc.id}</TableCell>
-                {columns.map((col) => (
+                <TableCell className="font-mono text-xs text-zinc-600">{doc.id}</TableCell>
+                {columnOrder.map((col) => (
                   <TableCell key={col} className="text-sm text-zinc-800 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                     <CellValue value={doc[col]} columnName={col} />
                   </TableCell>
