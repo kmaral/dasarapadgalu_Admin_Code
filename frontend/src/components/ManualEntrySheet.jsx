@@ -101,7 +101,13 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                   }}
                 >
                   <SelectTrigger data-testid="artist-select" className="rounded-none mt-1">
-                    <SelectValue placeholder="ಕಲಾವಿದರನ್ನು ಆಯ್ಕೆಮಾಡಿ..." />
+                    <SelectValue placeholder="ಕಲಾವಿದರನ್ನು ಆಯ್ಕೆಮಾಡಿ...">
+                      {formData.ArtistID ? (
+                        artists.find(a => a.id === formData.ArtistID)?.ARTISTNAMEKN || 
+                        artists.find(a => a.id === formData.ArtistID)?.ARTISTNAMEEN ||
+                        formData.ArtistID
+                      ) : "ಕಲಾವಿದರನ್ನು ಆಯ್ಕೆಮಾಡಿ..."}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {artists.map((artist) => (
@@ -138,7 +144,13 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                   }}
                 >
                   <SelectTrigger data-testid="category-select" className="rounded-none mt-1">
-                    <SelectValue placeholder="ವರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ..." />
+                    <SelectValue placeholder="ವರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ...">
+                      {formData.CategoryID ? (
+                        categories.find(c => c.id === formData.CategoryID)?.CategoryNameKN || 
+                        categories.find(c => c.id === formData.CategoryID)?.CategoryNameEN ||
+                        formData.CategoryID
+                      ) : "ವರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ..."}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
