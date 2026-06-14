@@ -97,16 +97,16 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                   onValueChange={(val) => {
                     const selectedArtist = artists.find(a => a.id === val);
                     handleInputChange('ArtistID', val);
-                    handleInputChange('ArtistName', selectedArtist?.ARTISTNAMEEN || selectedArtist?.ARTISTSIGNEN || '');
+                    handleInputChange('ArtistName', selectedArtist?.ARTISTNAMEKN || selectedArtist?.ARTISTNAMEEN || '');
                   }}
                 >
                   <SelectTrigger data-testid="artist-select" className="rounded-none mt-1">
-                    <SelectValue placeholder="Choose an artist..." />
+                    <SelectValue placeholder="ಕಲಾವಿದರನ್ನು ಆಯ್ಕೆಮಾಡಿ..." />
                   </SelectTrigger>
                   <SelectContent>
                     {artists.map((artist) => (
                       <SelectItem key={artist.id} value={artist.id}>
-                        {artist.ARTISTNAMEEN || artist.ARTISTSIGNEN || artist.id}
+                        {artist.ARTISTNAMEKN || artist.ARTISTNAMEEN || artist.ARTISTSIGNEN || artist.id}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -119,7 +119,7 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                   data-testid="artist-name"
                   value={formData.ArtistName || ''}
                   onChange={(e) => handleInputChange('ArtistName', e.target.value)}
-                  placeholder="Artist name"
+                  placeholder="ಕಲಾವಿದರ ಹೆಸರು"
                   className="rounded-none mt-1"
                   readOnly
                 />
@@ -134,16 +134,16 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                   onValueChange={(val) => {
                     const selectedCategory = categories.find(c => c.id === val);
                     handleInputChange('CategoryID', val);
-                    handleInputChange('CategoryName', selectedCategory?.CategoryNameEN || '');
+                    handleInputChange('CategoryName', selectedCategory?.CategoryNameKN || selectedCategory?.CategoryNameEN || '');
                   }}
                 >
                   <SelectTrigger data-testid="category-select" className="rounded-none mt-1">
-                    <SelectValue placeholder="Choose a category..." />
+                    <SelectValue placeholder="ವರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ..." />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
-                        {cat.CategoryNameEN || cat.id}
+                        {cat.CategoryNameKN || cat.CategoryNameEN || cat.id}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -156,22 +156,11 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                   data-testid="category-name"
                   value={formData.CategoryName || ''}
                   onChange={(e) => handleInputChange('CategoryName', e.target.value)}
-                  placeholder="Category name"
+                  placeholder="ವರ್ಗದ ಹೆಸರು"
                   className="rounded-none mt-1"
                   readOnly
                 />
               </div>
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Group</Label>
-              <Input
-                data-testid="song-group"
-                value={formData.SongGroup || ''}
-                onChange={(e) => handleInputChange('SongGroup', e.target.value)}
-                placeholder="Enter song group"
-                className="rounded-none mt-1"
-              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
