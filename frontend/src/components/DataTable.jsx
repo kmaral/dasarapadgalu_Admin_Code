@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,6 +15,36 @@ import Fuse from 'fuse.js';
 import { advancedSearch } from '@/lib/advancedSearch';
 
 const PAGE_SIZE = 50;
+const CELL_TRUNCATE_LEN = 40;
+
+// Truncates long values and shows the full text in a popover on click.
+// Plain (short) values render inline so the grid feels normal.
+function CellValue({ value, columnName }) {
+  const raw = typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '-');
+  if (raw.length <= CELL_TRUNCATE_LEN) return <span>{raw}</span>;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-testid={`cell-popover-${columnName}`}
+          className="text-left text-[#002FA7] hover:underline focus:outline-none"
+          style={{ fontFamily: 'inherit' }}
+        >
+          {raw.slice(0, CELL_TRUNCATE_LEN)}…
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="max-w-[420px] max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-sm rounded-sm border-zinc-300"
+        style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+      >
+        <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">{columnName}</div>
+        {raw}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export function DataTable({ collectionName, onEditDocument, onDocumentCountChange, onDocumentsChange }) {
   const [documents, setDocuments] = useState([]);
@@ -422,7 +453,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
                 <TableCell className="font-mono text-xs text-zinc-600 sticky left-16 bg-white z-10">{doc.id}</TableCell>
                 {columns.map((col) => (
                   <TableCell key={col} className="text-sm text-zinc-800 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-                    {typeof doc[col] === 'object' ? JSON.stringify(doc[col]) : String(doc[col] ?? '-')}
+                    <CellValue value={doc[col]} columnName={col} />
                   </TableCell>
                 ))}
                 <TableCell className="text-right sticky right-0 bg-white z-10">
