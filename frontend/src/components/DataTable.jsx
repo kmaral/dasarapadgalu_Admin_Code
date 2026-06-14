@@ -14,6 +14,20 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Fuse from 'fuse.js';
 import { advancedSearch } from '@/lib/advancedSearch';
 
+// Parse "DD-MM-YYYY HH:MM:SS" → Date for accurate chronological ordering.
+// Returns null if format isn't recognized (the caller treats null as "missing").
+function parseLastTimestamp(value) {
+  if (!value || typeof value !== 'string') return null;
+  const m = value.trim().match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?$/);
+  if (!m) {
+    // try generic Date parser as fallback (ISO etc.)
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const [, dd, mm, yyyy, hh = '0', mi = '0', ss = '0'] = m;
+  return new Date(+yyyy, +mm - 1, +dd, +hh, +mi, +ss);
+}
+
 const PAGE_SIZE = 50;
 const CELL_TRUNCATE_LEN = 40;
 
@@ -54,13 +68,20 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [columns, setColumns] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
-  const [sortBy, setSortBy] = useState('id-desc');
+  const [sortBy, setSortBy] = useState(
+    collectionName === 'SongDetails' ? 'lasttimeStamp-desc' : 'id-desc'
+  );
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] = useState(null);
   const [totalCount, setTotalCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchAlgorithm, setSearchAlgorithm] = useState('advanced'); // 'advanced' or 'fuzzy'
+
+  // Reset sort when switching collections
+  useEffect(() => {
+    setSortBy(collectionName === 'SongDetails' ? 'lasttimeStamp-desc' : 'id-desc');
+  }, [collectionName]);
 
   // Load initial data with pagination - order by songid desc for SongDetails
   useEffect(() => {
@@ -152,9 +173,13 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
           
           setLoading(false);
         });
+      } else if (error.code === 'unavailable') {
+        // Transient network issue — Firebase auto-reconnects, no need to alarm user
+        console.warn('Firestore temporarily unavailable, will retry automatically');
+        setLoading(false);
       } else {
         console.error('Firestore error:', error);
-        toast.error('Failed to load documents');
+        toast.error(`Failed to load documents: ${error.message || error.code || 'unknown'}`);
         setLoading(false);
       }
     });
@@ -214,18 +239,24 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   useEffect(() => {
     const sorted = [...documents].sort((a, b) => {
       const [field, order] = sortBy.split('-');
-      
+      const dir = order === 'asc' ? 1 : -1;
+
+      // Chronological sort for lasttimeStamp (handles "DD-MM-YYYY HH:MM:SS")
+      if (field === 'lasttimeStamp') {
+        const ad = parseLastTimestamp(a[field]);
+        const bd = parseLastTimestamp(b[field]);
+        if (ad && bd) return (ad.getTime() - bd.getTime()) * dir;
+        if (ad && !bd) return -1;
+        if (!ad && bd) return 1;
+        return 0;
+      }
+
       let aVal = a[field];
       let bVal = b[field];
-      
       if (typeof aVal === 'string') aVal = aVal.toLowerCase();
       if (typeof bVal === 'string') bVal = bVal.toLowerCase();
-      
-      if (order === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
+      if (aVal === bVal) return 0;
+      return (aVal > bVal ? 1 : -1) * dir;
     });
     
     setSortedDocuments(sorted);
