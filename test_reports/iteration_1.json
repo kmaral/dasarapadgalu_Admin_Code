@@ -1,0 +1,46 @@
+{
+  "summary": "Frontend testing of Firebase Firestore Manager. UI renders correctly: all 6 collections in sidebar, real-time READ from Firestore works (Languages has 3 docs, ArtistCollections has many docs). However, ALL WRITE OPERATIONS FAIL due to Firestore security rules - permission denied. This blocks Create, Edit, Delete and Bulk Upload (CSV/JSON) flows entirely. Empty-field client-side validation does work (toast appears).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Create document (manual entry)",
+        "issue": "FirebaseError: Missing or insufficient permissions. Console error logged from ManualEntrySheet.handleSubmit when calling addDoc/updateDoc. Toast 'Failed to save document' should appear. Sheet remains open after failure (only closed on success), so user can retry, but no write is possible.",
+        "affected_selectors": ["[data-testid=\"save-document-button\"]"]
+      },
+      {
+        "flow": "Edit / Delete / Bulk Upload (CSV & JSON)",
+        "issue": "Not testable end-to-end because the underlying writeBatch / updateDoc / deleteDoc calls will hit the same Firestore permission-denied error. Read (onSnapshot) succeeds for all collections, confirming the project + config are correct.",
+        "affected_selectors": ["[data-testid=\"file-input\"]", "[data-testid=\"edit-document-*\"]", "[data-testid=\"delete-document-*\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "FIX FIRESTORE SECURITY RULES: Project 'haribhajane-eb8b5' currently denies writes. Since the requirement is 'open access (no authentication)', update Firestore rules in Firebase Console to: rules_version='2'; service cloud.firestore { match /databases/{database}/documents { match /{document=**} { allow read, write: if true; } } }. Note: open rules are a security risk - recommend at minimum restricting by an API key check or App Check.",
+    "After rules are updated, re-test full CRUD + bulk CSV/JSON upload flows.",
+    "Consider closing the ManualEntrySheet on error too, OR explicitly show inline error inside sheet (currently only sonner toast surfaces it).",
+    "Bulk upload: papaparse with header:true may produce stray empty-string keys if CSV has trailing commas - validate before writing to Firestore."
+  ],
+  "critical_code_review_comments": [
+    "DataTable.jsx renders all keys as columns from union of docs - large collections (e.g. ArtistCollections) cause very wide tables with horizontal scroll; consider column virtualization or a 'fields to show' selector.",
+    "ManualEntrySheet stores all field values as raw strings - numeric fields like 'ArtistID', 'Language_id' will be saved as strings, which will mismatch existing Firestore data types and break queries/sorting. Add optional type coercion (number/boolean/JSON).",
+    "BulkUploadDialog uses CSV header row blindly - no preview / column-mapping step; users can silently pollute collections with wrong schema.",
+    "Firebase config is hardcoded in /app/frontend/src/lib/firebase.js. Should be moved to env vars (REACT_APP_FIREBASE_*) to avoid leaking keys in source and to allow environment switching.",
+    "No confirmation dialog before delete - one accidental click on dropdown 'Delete' permanently removes a document.",
+    "DataTable: editing while another user mutates same doc has no conflict handling (Firestore lastWriteWins) - acceptable for this MVP but worth noting."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "40% - reads work, all writes blocked by Firestore rules"},
+  "test_credentials": "N/A - open access app, no auth",
+  "seed_data_creation": "Attempted to create TEST_ prefixed docs in 'Languages' collection; all writes rejected by Firestore so no test data was persisted (no cleanup needed).",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "App URL: https://collection-hub-97.preview.emergentagent.com. UI loads cleanly with sidebar of 6 collections and a real-time data table. The blocker is Firestore security rules: every write (addDoc/updateDoc/deleteDoc/writeBatch) returns 'Missing or insufficient permissions'. Reads (onSnapshot) work fine. Once rules are opened up in Firebase console, run CRUD + bulk JSON + bulk CSV upload tests on the 'Languages' collection (smallest, 3 docs) using TEST_ prefix and clean up after.",
+  "rca of the issue": "Root cause: Firestore security rules for project 'haribhajane-eb8b5' deny client writes (default 'allow read, write: if false' or auth-only). The frontend uses Firebase Web SDK directly with no auth (anonymous), so every write request is rejected server-side. Reproduction: open app -> Languages -> Add Document -> fill one field -> Create -> console shows 'FirebaseError: Missing or insufficient permissions.' and sonner toast 'Failed to save document'. Mitigation: update Firestore rules to allow public writes for the listed 6 collections (or all, given the open-access requirement). Long-term: protect with App Check or move writes behind the backend with a service-account-signed admin SDK."
+}
