@@ -72,10 +72,16 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
 
     const batch = writeBatch(db);
     const collectionRef = collection(db, collectionName);
+    const timestamp = new Date();
     
     data.forEach((item) => {
       const docRef = doc(collectionRef);
-      batch.set(docRef, item);
+      const itemWithTimestamp = {
+        ...item,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+      batch.set(docRef, itemWithTimestamp);
     });
 
     await batch.commit();

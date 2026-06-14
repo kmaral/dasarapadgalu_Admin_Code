@@ -70,7 +70,12 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
         await updateDoc(doc(db, collectionName, editingDoc.id), formData);
         toast.success('Document updated successfully');
       } else {
-        await addDoc(collection(db, collectionName), formData);
+        const dataWithTimestamp = {
+          ...formData,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        await addDoc(collection(db, collectionName), dataWithTimestamp);
         toast.success('Document created successfully');
       }
 

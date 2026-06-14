@@ -31,6 +31,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [searchResults, setSearchResults] = useState([]);
   const [searchAlgorithm, setSearchAlgorithm] = useState('advanced'); // 'advanced' or 'fuzzy'
 
+  // Load initial data with pagination
   useEffect(() => {
     if (!collectionName) return;
     
@@ -39,9 +40,10 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     setHasMore(true);
     setLastDoc(null);
     
+    // Order by createdAt timestamp if available, otherwise by document ID
     const q = query(
       collection(db, collectionName),
-      orderBy('__name__'),
+      orderBy('createdAt', 'desc'),
       limit(PAGE_SIZE)
     );
     
@@ -73,9 +75,48 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       
       setLoading(false);
     }, (error) => {
-      console.error('Firestore error:', error);
-      toast.error('Failed to load documents');
-      setLoading(false);
+      // If createdAt index doesn't exist, fall back to __name__
+      if (error.code === 'failed-precondition' || error.message.includes('index')) {
+        console.log('Falling back to document ID ordering');
+        const fallbackQuery = query(
+          collection(db, collectionName),
+          orderBy('__name__'),
+          limit(PAGE_SIZE)
+        );
+        
+        onSnapshot(fallbackQuery, (snapshot) => {
+          const docs = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          setDocuments(docs);
+          onDocumentsChange?.(docs);
+          
+          if (snapshot.docs.length > 0) {
+            setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+            setHasMore(snapshot.docs.length === PAGE_SIZE);
+          } else {
+            setHasMore(false);
+          }
+          
+          if (docs.length > 0) {
+            const allKeys = new Set();
+            docs.forEach(doc => {
+              Object.keys(doc).forEach(key => allKeys.add(key));
+            });
+            setColumns(Array.from(allKeys).filter(key => key !== 'id'));
+          } else {
+            setColumns([]);
+          }
+          
+          setLoading(false);
+        });
+      } else {
+        console.error('Firestore error:', error);
+        toast.error('Failed to load documents');
+        setLoading(false);
+      }
     });
 
     getDocs(collection(db, collectionName)).then((snap) => {
@@ -93,7 +134,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     try {
       const q = query(
         collection(db, collectionName),
-        orderBy('__name__'),
+        orderBy('createdAt', 'desc'),
         startAfter(lastDoc),
         limit(PAGE_SIZE)
       );
