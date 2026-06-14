@@ -49,7 +49,7 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
     } else {
       setFormData({});
     }
-  }, [editingDoc, isOpen]);
+  }, [editingDoc, isOpen, collectionName]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
