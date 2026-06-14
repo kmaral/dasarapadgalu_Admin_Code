@@ -163,14 +163,22 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                 >
                   <SelectTrigger data-testid="song-group-select" className="rounded-none mt-1">
                     <SelectValue placeholder="Select category...">
-                      {formData.songGroup || 'Select category...'}
+                      {(() => {
+                        const cat = categories.find(
+                          c => String(c.categoryID ?? c.CategoryID ?? c.id) === String(formData.songGroup)
+                        );
+                        return cat
+                          ? (cat.categoryNameKA || cat.CategoryNameKA || cat.categoryNameKN || cat.CategoryNameKN || cat.categoryNameEN || cat.CategoryNameEN || formData.songGroup)
+                          : (formData.songGroup || 'Select category...');
+                      })()}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => {
-                      const label = cat.CategoryNameKN || cat.CategoryNameEN || cat.id;
+                      const key = String(cat.categoryID ?? cat.CategoryID ?? cat.id);
+                      const label = cat.categoryNameKA || cat.CategoryNameKA || cat.categoryNameKN || cat.CategoryNameKN || cat.categoryNameEN || cat.CategoryNameEN || key;
                       return (
-                        <SelectItem key={cat.id} value={label}>
+                        <SelectItem key={cat.id} value={key}>
                           {label}
                         </SelectItem>
                       );
