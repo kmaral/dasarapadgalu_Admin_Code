@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { collection, query, limit, onSnapshot, deleteDoc, doc, orderBy, startAfter, getDocs } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, deleteDoc, doc, orderBy, startAfter, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -7,7 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import Fuse from 'fuse.js';
@@ -31,7 +31,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [searchResults, setSearchResults] = useState([]);
   const [searchAlgorithm, setSearchAlgorithm] = useState('advanced'); // 'advanced' or 'fuzzy'
 
-  // Load initial data with pagination - order by PlayCount desc, then createdAt desc
+  // Load initial data with pagination - order by songid desc for SongDetails
   useEffect(() => {
     if (!collectionName) return;
     
@@ -40,13 +40,12 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     setHasMore(true);
     setLastDoc(null);
     
-    // For SongDetails, order by PlayCount (most played first)
+    // For SongDetails, order by songid (descending - newest first)
     let q;
     if (collectionName === 'SongDetails') {
       q = query(
         collection(db, collectionName),
-        orderBy('PlayCount', 'desc'),
-        orderBy('createdAt', 'desc'),
+        orderBy('songid', 'desc'),
         limit(PAGE_SIZE)
       );
     } else {
@@ -143,12 +142,22 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     
     setLoadingMore(true);
     try {
-      const q = query(
-        collection(db, collectionName),
-        orderBy('createdAt', 'desc'),
-        startAfter(lastDoc),
-        limit(PAGE_SIZE)
-      );
+      let q;
+      if (collectionName === 'SongDetails') {
+        q = query(
+          collection(db, collectionName),
+          orderBy('songid', 'desc'),
+          startAfter(lastDoc),
+          limit(PAGE_SIZE)
+        );
+      } else {
+        q = query(
+          collection(db, collectionName),
+          orderBy('createdAt', 'desc'),
+          startAfter(lastDoc),
+          limit(PAGE_SIZE)
+        );
+      }
       
       const snapshot = await getDocs(q);
       const newDocs = snapshot.docs.map(doc => ({

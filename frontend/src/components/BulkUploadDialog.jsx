@@ -75,23 +75,33 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
       const collectionRef = collection(db, collectionName);
       const baseTimestamp = new Date();
       
+      // Get max songid for SongDetails
+      let nextSongId = 1;
+      if (collectionName === 'SongDetails') {
+        const snapshot = await getDocs(collectionRef);
+        const maxSongId = snapshot.docs.reduce((max, doc) => {
+          const docData = doc.data();
+          return docData.songid && docData.songid > max ? docData.songid : max;
+        }, 0);
+        nextSongId = maxSongId + 1;
+        console.log(`Starting from songid: ${nextSongId}`);
+      }
+      
       console.log(`Uploading ${data.length} documents to ${collectionName}...`);
       
       data.forEach((item, index) => {
         const docRef = doc(collectionRef);
         
-        // Parse lasttimeStamp if provided, otherwise use current time
+        // Parse lasttimeStamp if provided
         let itemTimestamp = new Date(baseTimestamp.getTime() + index);
         if (item.lasttimeStamp) {
           try {
-            // Parse format: "14-06-2026 18:50:11"
             const parts = item.lasttimeStamp.split(' ');
             const dateParts = parts[0].split('-');
             const timeParts = parts[1]?.split(':') || ['00', '00', '00'];
             
-            // Create date: day-month-year format
             const day = parseInt(dateParts[0]);
-            const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
+            const month = parseInt(dateParts[1]) - 1;
             const year = parseInt(dateParts[2]);
             const hour = parseInt(timeParts[0]);
             const minute = parseInt(timeParts[1]);
@@ -106,17 +116,30 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
         
         const itemWithTimestamp = {
           ...item,
+          songid: collectionName === 'SongDetails' ? (item.songid || nextSongId + index) : undefined,
           PlayCount: item.PlayCount || 0,
           createdAt: itemTimestamp,
           updatedAt: itemTimestamp
         };
+        
+        // Remove undefined fields
+        Object.keys(itemWithTimestamp).forEach(key => 
+          itemWithTimestamp[key] === undefined && delete itemWithTimestamp[key]
+        );
+        
         batch.set(docRef, itemWithTimestamp);
-        console.log(`Document ${index + 1}:`, itemWithTimestamp);
+        console.log(`Document ${index + 1} (songid: ${itemWithTimestamp.songid || 'N/A'}):`, itemWithTimestamp);
       });
 
       await batch.commit();
       console.log(`✅ Successfully uploaded ${data.length} documents to ${collectionName}`);
-      toast.success(`Successfully uploaded ${data.length} documents to ${collectionName}`);
+      
+      if (collectionName === 'SongDetails') {
+        toast.success(`Successfully uploaded ${data.length} songs (songid ${nextSongId} to ${nextSongId + data.length - 1})`);
+      } else {
+        toast.success(`Successfully uploaded ${data.length} documents to ${collectionName}`);
+      }
+      
       setPastedText('');
       onClose();
     } catch (error) {

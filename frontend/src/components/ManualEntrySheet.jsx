@@ -70,14 +70,34 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
         await updateDoc(doc(db, collectionName, editingDoc.id), formData);
         toast.success('Document updated successfully');
       } else {
+        let songid = 1;
+        
+        // Get max songid for SongDetails
+        if (collectionName === 'SongDetails') {
+          const snapshot = await getDocs(collection(db, collectionName));
+          const maxSongId = snapshot.docs.reduce((max, doc) => {
+            const data = doc.data();
+            return data.songid && data.songid > max ? data.songid : max;
+          }, 0);
+          songid = maxSongId + 1;
+          console.log(`Next songid: ${songid}`);
+        }
+        
         const dataWithTimestamp = {
           ...formData,
-          PlayCount: 0, // Initialize play count to 0
+          songid: collectionName === 'SongDetails' ? songid : undefined,
+          PlayCount: 0,
           createdAt: new Date(),
           updatedAt: new Date()
         };
+        
+        // Remove undefined fields
+        Object.keys(dataWithTimestamp).forEach(key => 
+          dataWithTimestamp[key] === undefined && delete dataWithTimestamp[key]
+        );
+        
         await addDoc(collection(db, collectionName), dataWithTimestamp);
-        toast.success('Document created successfully');
+        toast.success(`Document created successfully with songid: ${songid}`);
       }
 
       setFormData({});

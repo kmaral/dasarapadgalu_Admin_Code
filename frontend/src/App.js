@@ -8,6 +8,8 @@ import { BulkUploadDialog } from '@/components/BulkUploadDialog';
 import { Toaster } from '@/components/ui/sonner';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 function App() {
   const [selectedCollection, setSelectedCollection] = useState('ArtistCollections');
@@ -15,7 +17,6 @@ function App() {
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const [editingDoc, setEditingDoc] = useState(null);
   const [documentCount, setDocumentCount] = useState(0);
-  const [allDocuments, setAllDocuments] = useState([]);
 
   const handleEditDocument = (doc) => {
     setEditingDoc(doc);
@@ -27,30 +28,44 @@ function App() {
     setTimeout(() => setEditingDoc(null), 300);
   };
 
-  const handleExport = (format) => {
-    if (allDocuments.length === 0) {
-      toast.error('No documents to export');
-      return;
-    }
+  const handleExport = async (format) => {
+    const toastId = toast.loading(`Fetching all ${selectedCollection} documents...`);
 
-    const filename = `${selectedCollection}_${new Date().toISOString().split('T')[0]}`;
+    try {
+      // Fetch ALL documents from Firestore (not just paginated/loaded ones)
+      const snapshot = await getDocs(collection(db, selectedCollection));
+      const exportDocs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    if (format === 'csv') {
-      const csv = Papa.unparse(allDocuments);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${filename}.csv`;
-      link.click();
-      toast.success(`Exported ${allDocuments.length} documents as CSV`);
-    } else if (format === 'json') {
-      const json = JSON.stringify(allDocuments, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${filename}.json`;
-      link.click();
-      toast.success(`Exported ${allDocuments.length} documents as JSON`);
+      if (exportDocs.length === 0) {
+        toast.error('No documents to export', { id: toastId });
+        return;
+      }
+
+      const filename = `${selectedCollection}_${new Date().toISOString().split('T')[0]}`;
+
+      if (format === 'csv') {
+        // Collect a union of all keys so CSV columns aren't missed for sparse docs
+        const allKeys = new Set();
+        exportDocs.forEach((d) => Object.keys(d).forEach((k) => allKeys.add(k)));
+        const csv = Papa.unparse(exportDocs, { columns: Array.from(allKeys) });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${filename}.csv`;
+        link.click();
+        toast.success(`Exported ${exportDocs.length} documents as CSV`, { id: toastId });
+      } else if (format === 'json') {
+        const json = JSON.stringify(exportDocs, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${filename}.json`;
+        link.click();
+        toast.success(`Exported ${exportDocs.length} documents as JSON`, { id: toastId });
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(`Failed to export: ${error.message}`, { id: toastId });
     }
   };
 
@@ -76,9 +91,6 @@ function App() {
             onEditDocument={handleEditDocument}
             onDocumentCountChange={(count) => {
               setDocumentCount(count);
-            }}
-            onDocumentsChange={(docs) => {
-              setAllDocuments(docs);
             }}
           />
         </main>
