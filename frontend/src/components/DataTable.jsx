@@ -158,33 +158,26 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     setSortBy(getDefaultSort(collectionName));
   }, [collectionName]);
 
-  // Load initial data with pagination - order by songid desc for SongDetails
+  // Load initial data.
+  // SongDetails: paginated (50 at a time, orderBy songid desc).
+  // Other collections: fetch all docs (no pagination, no Load More).
   useEffect(() => {
     if (!collectionName) return;
     
     setLoading(true);
     setDocuments([]);
-    setHasMore(true);
+    setHasMore(collectionName === 'SongDetails');
     setLastDoc(null);
     
-    // For SongDetails, order by songid (descending - newest first).
-    // For other collections, order by document ID (descending). Using documentId()
-    // guarantees every doc is returned — older docs that may be missing
-    // `createdAt` were being silently filtered out by `orderBy('createdAt')`.
-    let q;
-    if (collectionName === 'SongDetails') {
-      q = query(
-        collection(db, collectionName),
-        orderBy('songid', 'desc'),
-        limit(PAGE_SIZE)
-      );
-    } else {
-      q = query(
-        collection(db, collectionName),
-        orderBy(documentId(), 'desc'),
-        limit(PAGE_SIZE)
-      );
-    }
+    const isPaginated = collectionName === 'SongDetails';
+
+    const q = isPaginated
+      ? query(
+          collection(db, collectionName),
+          orderBy('songid', 'desc'),
+          limit(PAGE_SIZE)
+        )
+      : query(collection(db, collectionName));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -194,9 +187,13 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       
       setDocuments(docs);
       
-      if (snapshot.docs.length > 0) {
-        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-        setHasMore(snapshot.docs.length === PAGE_SIZE);
+      if (isPaginated) {
+        if (snapshot.docs.length > 0) {
+          setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+          setHasMore(snapshot.docs.length === PAGE_SIZE);
+        } else {
+          setHasMore(false);
+        }
       } else {
         setHasMore(false);
       }
@@ -217,47 +214,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       
       setLoading(false);
     }, (error) => {
-      // If index doesn't exist, fall back to a plain query (Firestore default = doc id asc)
-      if (error.code === 'failed-precondition' || error.message.includes('index')) {
-        console.log('Falling back to no orderBy');
-        const fallbackQuery = query(
-          collection(db, collectionName),
-          limit(PAGE_SIZE)
-        );
-        
-        onSnapshot(fallbackQuery, (snapshot) => {
-          const docs = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          
-          setDocuments(docs);
-          
-          if (snapshot.docs.length > 0) {
-            setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-            setHasMore(snapshot.docs.length === PAGE_SIZE);
-          } else {
-            setHasMore(false);
-          }
-          
-          if (docs.length > 0) {
-            const allKeys = new Set();
-            docs.forEach(doc => {
-              Object.keys(doc).forEach(key => allKeys.add(key));
-            });
-            let cols = Array.from(allKeys).filter(key => key !== 'id');
-            if (collectionName === 'SongDetails') {
-              cols = cols.filter(k => k.toLowerCase() !== 'playcount');
-            }
-            setColumns(cols);
-          } else {
-            setColumns([]);
-          }
-          
-          setLoading(false);
-        });
-      } else if (error.code === 'unavailable') {
-        // Transient network issue — Firebase auto-reconnects, no need to alarm user
+      if (error.code === 'unavailable') {
         console.warn('Firestore temporarily unavailable, will retry automatically');
         setLoading(false);
       } else {
@@ -276,26 +233,16 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   }, [collectionName]);
 
   const loadMore = async () => {
-    if (!lastDoc || loadingMore) return;
+    if (!lastDoc || loadingMore || collectionName !== 'SongDetails') return;
     
     setLoadingMore(true);
     try {
-      let q;
-      if (collectionName === 'SongDetails') {
-        q = query(
-          collection(db, collectionName),
-          orderBy('songid', 'desc'),
-          startAfter(lastDoc),
-          limit(PAGE_SIZE)
-        );
-      } else {
-        q = query(
-          collection(db, collectionName),
-          orderBy(documentId(), 'desc'),
-          startAfter(lastDoc),
-          limit(PAGE_SIZE)
-        );
-      }
+      const q = query(
+        collection(db, collectionName),
+        orderBy('songid', 'desc'),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
       
       const snapshot = await getDocs(q);
       const newDocs = snapshot.docs.map(doc => ({
