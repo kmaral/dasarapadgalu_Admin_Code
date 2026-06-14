@@ -3,28 +3,34 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { X, Plus } from 'lucide-react';
 
 export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }) {
-  const [fields, setFields] = useState([{ key: '', value: '' }]);
+  const [fields, setFields] = useState([{ key: '', value: '', type: 'string' }]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (editingDoc) {
       const docFields = Object.entries(editingDoc)
         .filter(([key]) => key !== 'id')
-        .map(([key, value]) => ({ key, value: String(value) }));
-      setFields(docFields.length > 0 ? docFields : [{ key: '', value: '' }]);
+        .map(([key, value]) => {
+          let type = 'string';
+          if (typeof value === 'number') type = 'number';
+          else if (typeof value === 'boolean') type = 'boolean';
+          return { key, value: String(value), type };
+        });
+      setFields(docFields.length > 0 ? docFields : [{ key: '', value: '', type: 'string' }]);
     } else {
-      setFields([{ key: '', value: '' }]);
+      setFields([{ key: '', value: '', type: 'string' }]);
     }
   }, [editingDoc, isOpen]);
 
   const addField = () => {
-    setFields([...fields, { key: '', value: '' }]);
+    setFields([...fields, { key: '', value: '', type: 'string' }]);
   };
 
   const removeField = (index) => {
@@ -37,15 +43,30 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
     setFields(newFields);
   };
 
+  const convertValue = (value, type) => {
+    if (!value) return value;
+    
+    switch (type) {
+      case 'number':
+        const num = Number(value);
+        return isNaN(num) ? value : num;
+      case 'boolean':
+        return value.toLowerCase() === 'true';
+      case 'string':
+      default:
+        return value;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       const data = {};
-      fields.forEach(({ key, value }) => {
+      fields.forEach(({ key, value, type }) => {
         if (key.trim()) {
-          data[key.trim()] = value;
+          data[key.trim()] = convertValue(value, type);
         }
       });
 
@@ -63,11 +84,11 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
         toast.success('Document created successfully');
       }
 
-      setFields([{ key: '', value: '' }]);
+      setFields([{ key: '', value: '', type: 'string' }]);
       onClose();
     } catch (error) {
       console.error('Submit error:', error);
-      toast.error('Failed to save document');
+      toast.error(`Failed to save document: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -88,14 +109,14 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
         <form onSubmit={handleSubmit} className="mt-8 space-y-6">
           <div className="space-y-4">
             {fields.map((field, index) => (
-              <div key={index} className="flex gap-3 items-start">
+              <div key={index} className="flex gap-2 items-start">
                 <div className="flex-1">
                   <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>Field Name</Label>
                   <Input
                     data-testid={`field-name-${index}`}
                     value={field.key}
                     onChange={(e) => updateField(index, 'key', e.target.value)}
-                    placeholder="e.g., name, email"
+                    placeholder="e.g., name, age"
                     className="rounded-none border-zinc-300 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7] mt-1"
                     style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
                   />
@@ -110,6 +131,19 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
                     className="rounded-none border-zinc-300 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7] mt-1"
                     style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
                   />
+                </div>
+                <div className="w-24">
+                  <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>Type</Label>
+                  <Select value={field.type} onValueChange={(val) => updateField(index, 'type', val)}>
+                    <SelectTrigger className="rounded-none mt-1 h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="string">String</SelectItem>
+                      <SelectItem value="number">Number</SelectItem>
+                      <SelectItem value="boolean">Boolean</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 {fields.length > 1 && (
                   <Button

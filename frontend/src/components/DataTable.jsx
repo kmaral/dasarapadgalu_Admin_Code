@@ -3,6 +3,7 @@ import { collection, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { MoreVertical, Edit, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,6 +13,8 @@ export function DataTable({ collectionName, onEditDocument }) {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [columns, setColumns] = useState([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [docToDelete, setDocToDelete] = useState(null);
 
   useEffect(() => {
     if (!collectionName) return;
@@ -49,13 +52,23 @@ export function DataTable({ collectionName, onEditDocument }) {
     return () => unsubscribe();
   }, [collectionName]);
 
-  const handleDelete = async (docId) => {
+  const confirmDelete = (docId) => {
+    setDocToDelete(docId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!docToDelete) return;
+    
     try {
-      await deleteDoc(doc(db, collectionName, docId));
+      await deleteDoc(doc(db, collectionName, docToDelete));
       toast.success('Document deleted successfully');
     } catch (error) {
       console.error('Delete error:', error);
-      toast.error('Failed to delete document');
+      toast.error(`Failed to delete document: ${error.message}`);
+    } finally {
+      setDeleteDialogOpen(false);
+      setDocToDelete(null);
     }
   };
 
@@ -80,62 +93,85 @@ export function DataTable({ collectionName, onEditDocument }) {
   }
 
   return (
-    <div className="border border-zinc-200 rounded-sm bg-white">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-zinc-50 hover:bg-zinc-50">
-            <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
-            {columns.map((col) => (
-              <TableHead key={col} className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-                {col}
-              </TableHead>
-            ))}
-            <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 text-right" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {documents.map((doc) => (
-            <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className="hover:bg-zinc-50">
-              <TableCell className="font-mono text-xs text-zinc-600">{doc.id}</TableCell>
-              {columns.map((col) => (
-                <TableCell key={col} className="text-sm text-zinc-800" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-                  {typeof doc[col] === 'object' ? JSON.stringify(doc[col]) : String(doc[col] ?? '-')}
-                </TableCell>
+    <>
+      <div className="border border-zinc-200 rounded-sm bg-white overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-zinc-50 hover:bg-zinc-50">
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
+              {columns.slice(0, 8).map((col) => (
+                <TableHead key={col} className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                  {col}
+                </TableHead>
               ))}
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      data-testid={`actions-menu-${doc.id}`}
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      data-testid={`edit-document-${doc.id}`}
-                      onClick={() => onEditDocument(doc)}
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      data-testid={`delete-document-${doc.id}`}
-                      onClick={() => handleDelete(doc.id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 text-right" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {documents.map((doc) => (
+              <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className="hover:bg-zinc-50">
+                <TableCell className="font-mono text-xs text-zinc-600">{doc.id}</TableCell>
+                {columns.slice(0, 8).map((col) => (
+                  <TableCell key={col} className="text-sm text-zinc-800 max-w-[200px] truncate" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                    {typeof doc[col] === 'object' ? JSON.stringify(doc[col]) : String(doc[col] ?? '-')}
+                  </TableCell>
+                ))}
+                <TableCell className="text-right">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        data-testid={`actions-menu-${doc.id}`}
+                        variant="ghost"
+                        className="h-8 w-8 p-0"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        data-testid={`edit-document-${doc.id}`}
+                        onClick={() => onEditDocument(doc)}
+                      >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        data-testid={`delete-document-${doc.id}`}
+                        onClick={() => confirmDelete(doc.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-none">
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ fontFamily: 'Chivo, sans-serif' }}>Confirm Delete</AlertDialogTitle>
+            <AlertDialogDescription style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              Are you sure you want to delete this document? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-none">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="confirm-delete-button"
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700 text-white rounded-none"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
