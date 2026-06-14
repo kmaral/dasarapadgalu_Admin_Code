@@ -28,6 +28,36 @@ function App() {
     setTimeout(() => setEditingDoc(null), 300);
   };
 
+  // Per-collection sort field (used to order export descending)
+  const SORT_FIELD_MAP = {
+    SongDetails: 'songid',
+    ArtistDetails: 'artistid',
+    ArtistCollections: 'artistid',
+    CategoryDetails: 'categoryid',
+    CategorySubDetails: 'categoryid',
+    Languages: 'languageid',
+  };
+
+  // Look up a field on a doc tolerating common case variants
+  // (e.g. songid / SongID / SongId / SONGID / ArtistID etc.)
+  const getFieldValue = (doc, field) => {
+    if (!field) return null;
+    const base = field.replace(/id$/i, '');
+    const variants = [
+      field,
+      field.toLowerCase(),
+      field.toUpperCase(),
+      field.charAt(0).toUpperCase() + field.slice(1).toLowerCase(),
+      base.charAt(0).toUpperCase() + base.slice(1).toLowerCase() + 'ID',
+      base.toLowerCase() + 'Id',
+      base.toUpperCase() + 'ID',
+    ];
+    for (const k of variants) {
+      if (doc[k] !== undefined && doc[k] !== null) return doc[k];
+    }
+    return null;
+  };
+
   const handleExport = async (format) => {
     const toastId = toast.loading(`Fetching all ${selectedCollection} documents...`);
 
@@ -39,6 +69,20 @@ function App() {
       if (exportDocs.length === 0) {
         toast.error('No documents to export', { id: toastId });
         return;
+      }
+
+      // Sort descending by the collection's primary id field (songid / categoryid / artistid)
+      const sortField = SORT_FIELD_MAP[selectedCollection];
+      if (sortField) {
+        exportDocs.sort((a, b) => {
+          const av = getFieldValue(a, sortField);
+          const bv = getFieldValue(b, sortField);
+          if (av == null && bv == null) return 0;
+          if (av == null) return 1;
+          if (bv == null) return -1;
+          if (typeof av === 'number' && typeof bv === 'number') return bv - av;
+          return String(bv).localeCompare(String(av), undefined, { numeric: true });
+        });
       }
 
       const filename = `${selectedCollection}_${new Date().toISOString().split('T')[0]}`;
