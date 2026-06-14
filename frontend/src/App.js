@@ -5,6 +5,7 @@ import { Header } from '@/components/Header';
 import { DataTable } from '@/components/DataTable';
 import { ManualEntrySheet } from '@/components/ManualEntrySheet';
 import { BulkUploadDialog } from '@/components/BulkUploadDialog';
+import { BrowseSongs } from '@/components/BrowseSongs';
 import { Toaster } from '@/components/ui/sonner';
 import Papa from 'papaparse';
 import { toast } from 'sonner';
@@ -12,6 +13,7 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 function App() {
+  const [view, setView] = useState('manage');
   const [selectedCollection, setSelectedCollection] = useState('ArtistCollections');
   const [manualEntryOpen, setManualEntryOpen] = useState(false);
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
@@ -118,26 +120,35 @@ function App() {
       <Sidebar
         selectedCollection={selectedCollection}
         onSelectCollection={setSelectedCollection}
+        view={view}
+        onSelectView={setView}
       />
       
       <div className="ml-64 flex-1 min-h-screen bg-white">
-        <Header
-          collectionName={selectedCollection}
-          documentCount={documentCount}
-          onOpenManualEntry={() => setManualEntryOpen(true)}
-          onOpenBulkUpload={() => setBulkUploadOpen(true)}
-          onExport={handleExport}
-        />
-        
-        <main className="p-8">
-          <DataTable
-            collectionName={selectedCollection}
-            onEditDocument={handleEditDocument}
-            onDocumentCountChange={(count) => {
-              setDocumentCount(count);
-            }}
-          />
-        </main>
+        {view === 'manage' ? (
+          <>
+            <Header
+              collectionName={selectedCollection}
+              documentCount={documentCount}
+              onOpenManualEntry={() => setManualEntryOpen(true)}
+              onOpenBulkUpload={() => setBulkUploadOpen(true)}
+              onExport={handleExport}
+            />
+            <main className="p-8">
+              <DataTable
+                collectionName={selectedCollection}
+                onEditDocument={handleEditDocument}
+                onDocumentCountChange={(count) => {
+                  setDocumentCount(count);
+                }}
+              />
+            </main>
+          </>
+        ) : (
+          <main className="p-8">
+            <BrowseSongs />
+          </main>
+        )}
       </div>
 
       <ManualEntrySheet

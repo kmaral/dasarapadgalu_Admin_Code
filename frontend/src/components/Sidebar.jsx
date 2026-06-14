@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Database } from 'lucide-react';
+import { Database, Library } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
@@ -12,7 +12,7 @@ const COLLECTIONS = [
   'SongDetails'
 ];
 
-export function Sidebar({ selectedCollection, onSelectCollection }) {
+export function Sidebar({ selectedCollection, onSelectCollection, view, onSelectView }) {
   const [collectionCounts, setCollectionCounts] = useState({});
 
   useEffect(() => {
@@ -45,6 +45,27 @@ export function Sidebar({ selectedCollection, onSelectCollection }) {
       
       <nav className="flex-1 px-4 py-6 overflow-y-auto">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-4 px-2">
+          Explore
+        </p>
+        <ul className="space-y-1 mb-6">
+          <li>
+            <button
+              data-testid="sidebar-nav-browse"
+              onClick={() => onSelectView?.('browse')}
+              className={`w-full text-left px-4 py-2 text-sm rounded-none transition-colors duration-150 flex items-center gap-3 ${
+                view === 'browse'
+                  ? 'bg-[#002FA7] text-white font-medium'
+                  : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900'
+              }`}
+              style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+            >
+              <Library className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Browse Songs</span>
+            </button>
+          </li>
+        </ul>
+
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-4 px-2">
           Collections
         </p>
         <ul className="space-y-1">
@@ -52,9 +73,12 @@ export function Sidebar({ selectedCollection, onSelectCollection }) {
             <li key={collectionName}>
               <button
                 data-testid={`sidebar-nav-${collectionName.toLowerCase()}`}
-                onClick={() => onSelectCollection(collectionName)}
+                onClick={() => {
+                  onSelectView?.('manage');
+                  onSelectCollection(collectionName);
+                }}
                 className={`w-full text-left px-4 py-2 text-sm rounded-none transition-colors duration-150 flex items-center justify-between ${
-                  selectedCollection === collectionName
+                  view === 'manage' && selectedCollection === collectionName
                     ? 'bg-[#002FA7] text-white font-medium'
                     : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900'
                 }`}
@@ -63,7 +87,7 @@ export function Sidebar({ selectedCollection, onSelectCollection }) {
                 <span className="truncate">{collectionName}</span>
                 <span 
                   className={`ml-2 px-2 py-0.5 text-xs font-mono rounded ${
-                    selectedCollection === collectionName
+                    view === 'manage' && selectedCollection === collectionName
                       ? 'bg-white/20 text-white'
                       : 'bg-zinc-200 text-zinc-600'
                   }`}

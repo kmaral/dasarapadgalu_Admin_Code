@@ -111,6 +111,9 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [searchAlgorithm, setSearchAlgorithm] = useState('advanced'); // 'advanced' or 'fuzzy'
+  // Full dataset cache (used so search can cover every doc, not only the
+  // currently paginated/loaded ones). Populated alongside the total-count fetch.
+  const [allDocuments, setAllDocuments] = useState([]);
 
   // Sync column order with current columns. Preserve user's saved order
   // from localStorage; append any new columns at the end; drop missing ones.
@@ -166,6 +169,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     
     setLoading(true);
     setDocuments([]);
+    setAllDocuments([]);
     setHasMore(collectionName === 'SongDetails');
     setLastDoc(null);
     
@@ -227,6 +231,9 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     getDocs(collection(db, collectionName)).then((snap) => {
       setTotalCount(snap.size);
       onDocumentCountChange?.(snap.size);
+      // Cache full dataset for search across all docs (not just paginated ones)
+      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setAllDocuments(all);
     });
 
     return () => unsubscribe();
@@ -328,7 +335,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       searchKeys.push(...columns);
     }
     
-    return new Fuse(documents, {
+    return new Fuse(allDocuments.length > 0 ? allDocuments : documents, {
       keys: searchKeys,
       threshold: 0.3, // 0 = exact match, 1 = match anything
       distance: 100,
@@ -338,44 +345,55 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       findAllMatches: true,
       includeScore: true
     });
-  }, [documents, columns]);
+  }, [documents, allDocuments, columns]);
 
-  // Get searchable fields
+  // Get searchable fields — derive from the full dataset (when cached) so we
+  // don't miss fields present only in non-paginated docs.
   const searchableFields = useMemo(() => {
-    if (columns.length === 0) return [];
+    const pool = allDocuments.length > 0 ? allDocuments : null;
+    const fieldSet = new Set(columns);
+    if (pool) {
+      pool.forEach((d) => Object.keys(d).forEach((k) => { if (k !== 'id') fieldSet.add(k); }));
+    }
+    const allCols = Array.from(fieldSet);
+    if (allCols.length === 0) return [];
     
     const fields = [];
-    columns.forEach(col => {
-      if (col.toLowerCase().includes('name') || 
-          col.toLowerCase().includes('title') ||
-          col.toLowerCase().includes('artist') ||
-          col.toLowerCase().includes('category') ||
-          col.toLowerCase().includes('song') ||
-          col.toLowerCase().includes('description')) {
+    allCols.forEach(col => {
+      const lower = col.toLowerCase();
+      if (lower.includes('name') ||
+          lower.includes('title') ||
+          lower.includes('artist') ||
+          lower.includes('category') ||
+          lower.includes('song') ||
+          lower.includes('group') ||
+          lower.includes('description') ||
+          lower.includes('lyric')) {
         fields.push(col);
       }
     });
-    
-    return fields.length > 0 ? fields : columns.slice(0, 5);
-  }, [columns]);
+    return fields.length > 0 ? fields : allCols.slice(0, 5);
+  }, [columns, allDocuments]);
 
-  // Handle search with selected algorithm
+  // Handle search with selected algorithm — search the full dataset when available.
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
       return;
     }
-    
+
+    // Use the cached full dataset so search covers ALL documents,
+    // not just the currently paginated/loaded ones.
+    const searchPool = allDocuments.length > 0 ? allDocuments : documents;
+
     if (searchAlgorithm === 'advanced') {
-      // Use advanced search with N-gram, trigram, and phonetic matching
-      const results = advancedSearch(searchQuery, documents, searchableFields);
+      const results = advancedSearch(searchQuery, searchPool, searchableFields);
       setSearchResults(results.map(r => r.document));
     } else {
-      // Use Fuse.js fuzzy search
       const results = fuse.search(searchQuery);
       setSearchResults(results.map(result => result.item));
     }
-  }, [searchQuery, documents, searchableFields, searchAlgorithm]);
+  }, [searchQuery, documents, allDocuments, searchableFields, searchAlgorithm, fuse]);
 
   // Display either search results or sorted documents
   const displayDocuments = searchQuery.trim() ? searchResults : sortedDocuments;
