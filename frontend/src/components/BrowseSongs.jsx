@@ -33,8 +33,28 @@ export function BrowseSongs() {
         ]);
         if (!mounted) return;
         setSongs(songsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setArtists(artistsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setCategories(categoriesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+        // Sort artists by artistID desc (numeric), categories by categoryGroupId desc
+        const sortDesc = (arr, ...keys) =>
+          [...arr].sort((a, b) => {
+            const av = Number(get(a, ...keys));
+            const bv = Number(get(b, ...keys));
+            const aOk = !isNaN(av);
+            const bOk = !isNaN(bv);
+            if (aOk && bOk) return bv - av;
+            if (aOk) return -1;
+            if (bOk) return 1;
+            return 0;
+          });
+
+        setArtists(sortDesc(
+          artistsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          'categoryGroupId', 'CategoryGroupID', 'artistID', 'ArtistID'
+        ));
+        setCategories(sortDesc(
+          categoriesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+          'categoryGroupId', 'CategoryGroupID', 'categoryID', 'CategoryID'
+        ));
       } finally {
         if (mounted) setLoading(false);
       }
