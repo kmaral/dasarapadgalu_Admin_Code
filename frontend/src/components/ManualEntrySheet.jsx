@@ -72,6 +72,7 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
       } else {
         const dataWithTimestamp = {
           ...formData,
+          PlayCount: 0, // Initialize play count to 0
           createdAt: new Date(),
           updatedAt: new Date()
         };

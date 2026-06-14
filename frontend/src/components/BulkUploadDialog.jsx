@@ -73,17 +73,42 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
     try {
       const batch = writeBatch(db);
       const collectionRef = collection(db, collectionName);
-      const timestamp = new Date();
+      const baseTimestamp = new Date();
       
       console.log(`Uploading ${data.length} documents to ${collectionName}...`);
       
       data.forEach((item, index) => {
         const docRef = doc(collectionRef);
-        // Add timestamp with millisecond offset for proper ordering
+        
+        // Parse lasttimeStamp if provided, otherwise use current time
+        let itemTimestamp = new Date(baseTimestamp.getTime() + index);
+        if (item.lasttimeStamp) {
+          try {
+            // Parse format: "14-06-2026 18:50:11"
+            const parts = item.lasttimeStamp.split(' ');
+            const dateParts = parts[0].split('-');
+            const timeParts = parts[1]?.split(':') || ['00', '00', '00'];
+            
+            // Create date: day-month-year format
+            const day = parseInt(dateParts[0]);
+            const month = parseInt(dateParts[1]) - 1; // JS months are 0-indexed
+            const year = parseInt(dateParts[2]);
+            const hour = parseInt(timeParts[0]);
+            const minute = parseInt(timeParts[1]);
+            const second = parseInt(timeParts[2]);
+            
+            itemTimestamp = new Date(year, month, day, hour, minute, second);
+            console.log(`✅ Using lasttimeStamp for ${item.SongNameEN}: ${itemTimestamp.toISOString()}`);
+          } catch (e) {
+            console.warn('⚠️ Failed to parse lasttimeStamp:', item.lasttimeStamp, e);
+          }
+        }
+        
         const itemWithTimestamp = {
           ...item,
-          createdAt: new Date(timestamp.getTime() + index),
-          updatedAt: new Date(timestamp.getTime() + index)
+          PlayCount: item.PlayCount || 0,
+          createdAt: itemTimestamp,
+          updatedAt: itemTimestamp
         };
         batch.set(docRef, itemWithTimestamp);
         console.log(`Document ${index + 1}:`, itemWithTimestamp);

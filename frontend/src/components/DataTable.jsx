@@ -31,7 +31,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [searchResults, setSearchResults] = useState([]);
   const [searchAlgorithm, setSearchAlgorithm] = useState('advanced'); // 'advanced' or 'fuzzy'
 
-  // Load initial data with pagination
+  // Load initial data with pagination - order by PlayCount desc, then createdAt desc
   useEffect(() => {
     if (!collectionName) return;
     
@@ -40,12 +40,23 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     setHasMore(true);
     setLastDoc(null);
     
-    // Order by createdAt timestamp if available, otherwise by document ID
-    const q = query(
-      collection(db, collectionName),
-      orderBy('createdAt', 'desc'),
-      limit(PAGE_SIZE)
-    );
+    // For SongDetails, order by PlayCount (most played first)
+    let q;
+    if (collectionName === 'SongDetails') {
+      q = query(
+        collection(db, collectionName),
+        orderBy('PlayCount', 'desc'),
+        orderBy('createdAt', 'desc'),
+        limit(PAGE_SIZE)
+      );
+    } else {
+      // For other collections, order by createdAt
+      q = query(
+        collection(db, collectionName),
+        orderBy('createdAt', 'desc'),
+        limit(PAGE_SIZE)
+      );
+    }
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
@@ -75,12 +86,12 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       
       setLoading(false);
     }, (error) => {
-      // If createdAt index doesn't exist, fall back to __name__
+      // If index doesn't exist, fall back to createdAt only
       if (error.code === 'failed-precondition' || error.message.includes('index')) {
-        console.log('Falling back to document ID ordering');
+        console.log('Falling back to createdAt ordering');
         const fallbackQuery = query(
           collection(db, collectionName),
-          orderBy('__name__'),
+          orderBy('createdAt', 'desc'),
           limit(PAGE_SIZE)
         );
         
@@ -384,7 +395,8 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
         <Table>
           <TableHeader>
             <TableRow className="bg-zinc-50 hover:bg-zinc-50">
-              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-0 bg-zinc-50 z-10" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-0 bg-zinc-50 z-10 w-16 text-center" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>#</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-16 bg-zinc-50 z-10" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
               {columns.map((col) => (
                 <TableHead key={col} className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                   {col}
@@ -394,9 +406,10 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayDocuments.map((doc) => (
+            {displayDocuments.map((doc, index) => (
               <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className="hover:bg-zinc-50">
-                <TableCell className="font-mono text-xs text-zinc-600 sticky left-0 bg-white z-10">{doc.id}</TableCell>
+                <TableCell className="font-semibold text-sm text-zinc-700 sticky left-0 bg-white z-10 text-center">{index + 1}</TableCell>
+                <TableCell className="font-mono text-xs text-zinc-600 sticky left-16 bg-white z-10">{doc.id}</TableCell>
                 {columns.map((col) => (
                   <TableCell key={col} className="text-sm text-zinc-800 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                     {typeof doc[col] === 'object' ? JSON.stringify(doc[col]) : String(doc[col] ?? '-')}
