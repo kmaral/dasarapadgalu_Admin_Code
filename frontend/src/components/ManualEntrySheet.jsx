@@ -70,34 +70,49 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
         await updateDoc(doc(db, collectionName, editingDoc.id), formData);
         toast.success('Document updated successfully');
       } else {
-        let songid = 1;
-        
-        // Get max songid for SongDetails
+        let dataToSave = { ...formData };
+
         if (collectionName === 'SongDetails') {
+          // Auto-assign next songid
           const snapshot = await getDocs(collection(db, collectionName));
-          const maxSongId = snapshot.docs.reduce((max, doc) => {
-            const data = doc.data();
+          const maxSongId = snapshot.docs.reduce((max, d) => {
+            const data = d.data();
             return data.songid && data.songid > max ? data.songid : max;
           }, 0);
-          songid = maxSongId + 1;
-          console.log(`Next songid: ${songid}`);
+          const songid = maxSongId + 1;
+
+          // Default lasttimeStamp = now if not set
+          const now = new Date();
+          const pad = (n) => String(n).padStart(2, '0');
+          const ts = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+          // Canonical schema only (drop any stray legacy keys)
+          dataToSave = {
+            songNameEN: formData.songNameEN || '',
+            songType: formData.songType || '',
+            songTE: formData.songTE || '',
+            songNameTE: formData.songNameTE || '',
+            songNameKA: formData.songNameKA || '',
+            songGroup: formData.songGroup || '',
+            songSN: formData.songSN || '',
+            lasttimeStamp: formData.lasttimeStamp || ts,
+            songArtist: formData.songArtist || '',
+            songIcon: formData.songIcon || '',
+            songNameSN: formData.songNameSN || '',
+            songKA: formData.songKA || '',
+            songid,
+          };
+          await addDoc(collection(db, collectionName), dataToSave);
+          toast.success(`Document created successfully with songid: ${songid}`);
+        } else {
+          const dataWithTimestamp = {
+            ...dataToSave,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          await addDoc(collection(db, collectionName), dataWithTimestamp);
+          toast.success('Document created successfully');
         }
-        
-        const dataWithTimestamp = {
-          ...formData,
-          songid: collectionName === 'SongDetails' ? songid : undefined,
-          PlayCount: 0,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        
-        // Remove undefined fields
-        Object.keys(dataWithTimestamp).forEach(key => 
-          dataWithTimestamp[key] === undefined && delete dataWithTimestamp[key]
-        );
-        
-        await addDoc(collection(db, collectionName), dataWithTimestamp);
-        toast.success(`Document created successfully with songid: ${songid}`);
       }
 
       setFormData({});
@@ -117,107 +132,71 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Select Artist</Label>
-                <Select 
-                  value={formData.ArtistID || ''} 
-                  onValueChange={(val) => {
-                    const selectedArtist = artists.find(a => a.id === val);
-                    handleInputChange('ArtistID', val);
-                    handleInputChange('ArtistName', selectedArtist?.ARTISTNAMEKN || selectedArtist?.ARTISTNAMEEN || '');
-                  }}
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Artist</Label>
+                <Select
+                  value={formData.songArtist || ''}
+                  onValueChange={(val) => handleInputChange('songArtist', val)}
                 >
-                  <SelectTrigger data-testid="artist-select" className="rounded-none mt-1">
-                    <SelectValue placeholder="ಕಲಾವಿದರನ್ನು ಆಯ್ಕೆಮಾಡಿ...">
-                      {formData.ArtistID ? (
-                        artists.find(a => a.id === formData.ArtistID)?.ARTISTNAMEKN || 
-                        artists.find(a => a.id === formData.ArtistID)?.ARTISTNAMEEN ||
-                        formData.ArtistID
-                      ) : "ಕಲಾವಿದರನ್ನು ಆಯ್ಕೆಮಾಡಿ..."}
+                  <SelectTrigger data-testid="song-artist-select" className="rounded-none mt-1">
+                    <SelectValue placeholder="Select or type artist...">
+                      {formData.songArtist || 'Select artist...'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {artists.map((artist) => (
-                      <SelectItem key={artist.id} value={artist.id}>
-                        {artist.ARTISTNAMEKN || artist.ARTISTNAMEEN || artist.ARTISTSIGNEN || artist.id}
-                      </SelectItem>
-                    ))}
+                    {artists.map((artist) => {
+                      const label = artist.ARTISTNAMEKN || artist.ARTISTNAMEEN || artist.ARTISTSIGNEN || artist.id;
+                      return (
+                        <SelectItem key={artist.id} value={label}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Artist Name</Label>
-                <Input
-                  data-testid="artist-name"
-                  value={formData.ArtistName || ''}
-                  onChange={(e) => handleInputChange('ArtistName', e.target.value)}
-                  placeholder="ಕಲಾವಿದರ ಹೆಸರು"
-                  className="rounded-none mt-1"
-                  readOnly
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Select Category</Label>
-                <Select 
-                  value={formData.CategoryID || ''} 
-                  onValueChange={(val) => {
-                    const selectedCategory = categories.find(c => c.id === val);
-                    handleInputChange('CategoryID', val);
-                    handleInputChange('CategoryName', selectedCategory?.CategoryNameKN || selectedCategory?.CategoryNameEN || '');
-                  }}
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Group</Label>
+                <Select
+                  value={formData.songGroup || ''}
+                  onValueChange={(val) => handleInputChange('songGroup', val)}
                 >
-                  <SelectTrigger data-testid="category-select" className="rounded-none mt-1">
-                    <SelectValue placeholder="ವರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ...">
-                      {formData.CategoryID ? (
-                        categories.find(c => c.id === formData.CategoryID)?.CategoryNameKN || 
-                        categories.find(c => c.id === formData.CategoryID)?.CategoryNameEN ||
-                        formData.CategoryID
-                      ) : "ವರ್ಗವನ್ನು ಆಯ್ಕೆಮಾಡಿ..."}
+                  <SelectTrigger data-testid="song-group-select" className="rounded-none mt-1">
+                    <SelectValue placeholder="Select category...">
+                      {formData.songGroup || 'Select category...'}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat) => (
-                      <SelectItem key={cat.id} value={cat.id}>
-                        {cat.CategoryNameKN || cat.CategoryNameEN || cat.id}
-                      </SelectItem>
-                    ))}
+                    {categories.map((cat) => {
+                      const label = cat.CategoryNameKN || cat.CategoryNameEN || cat.id;
+                      return (
+                        <SelectItem key={cat.id} value={label}>
+                          {label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Category Name</Label>
-                <Input
-                  data-testid="category-name"
-                  value={formData.CategoryName || ''}
-                  onChange={(e) => handleInputChange('CategoryName', e.target.value)}
-                  placeholder="ವರ್ಗದ ಹೆಸರು"
-                  className="rounded-none mt-1"
-                  readOnly
-                />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (English)</Label>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (EN)</Label>
                 <Input
                   data-testid="song-name-en"
-                  value={formData.SongNameEN || ''}
-                  onChange={(e) => handleInputChange('SongNameEN', e.target.value)}
+                  value={formData.songNameEN || ''}
+                  onChange={(e) => handleInputChange('songNameEN', e.target.value)}
                   placeholder="Enter song name in English"
                   className="rounded-none mt-1"
                 />
               </div>
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (Kannada)</Label>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (KA)</Label>
                 <Input
-                  data-testid="song-name-kn"
-                  value={formData.SongNameKN || ''}
-                  onChange={(e) => handleInputChange('SongNameKN', e.target.value)}
+                  data-testid="song-name-ka"
+                  value={formData.songNameKA || ''}
+                  onChange={(e) => handleInputChange('songNameKA', e.target.value)}
                   placeholder="ಹಾಡಿನ ಹೆಸರು"
                   className="rounded-none mt-1"
                 />
@@ -226,36 +205,94 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (Hindi)</Label>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (TE)</Label>
                 <Input
-                  data-testid="song-name-hi"
-                  value={formData.SongNameHI || ''}
-                  onChange={(e) => handleInputChange('SongNameHI', e.target.value)}
-                  placeholder="गाने का नाम"
+                  data-testid="song-name-te"
+                  value={formData.songNameTE || ''}
+                  onChange={(e) => handleInputChange('songNameTE', e.target.value)}
+                  placeholder="పాట పేరు"
                   className="rounded-none mt-1"
                 />
               </div>
               <div>
-                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (Telugu)</Label>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Name (SN)</Label>
                 <Input
-                  data-testid="song-name-te"
-                  value={formData.SongNameTE || ''}
-                  onChange={(e) => handleInputChange('SongNameTE', e.target.value)}
-                  placeholder="పాట పేరు"
+                  data-testid="song-name-sn"
+                  value={formData.songNameSN || ''}
+                  onChange={(e) => handleInputChange('songNameSN', e.target.value)}
+                  placeholder="संस्कृत नाम"
+                  className="rounded-none mt-1"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Type</Label>
+                <Input
+                  data-testid="song-type"
+                  value={formData.songType || ''}
+                  onChange={(e) => handleInputChange('songType', e.target.value)}
+                  placeholder="Type"
+                  className="rounded-none mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Icon</Label>
+                <Input
+                  data-testid="song-icon"
+                  value={formData.songIcon || ''}
+                  onChange={(e) => handleInputChange('songIcon', e.target.value)}
+                  placeholder="Icon URL"
                   className="rounded-none mt-1"
                 />
               </div>
             </div>
 
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Next Song Count</Label>
+              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Last Timestamp (DD-MM-YYYY HH:MM:SS)</Label>
               <Input
-                data-testid="next-song-count"
-                type="number"
-                value={formData.NextSongCount || ''}
-                onChange={(e) => handleInputChange('NextSongCount', parseInt(e.target.value) || 0)}
-                placeholder="Enter next song count"
+                data-testid="last-timestamp"
+                value={formData.lasttimeStamp || ''}
+                onChange={(e) => handleInputChange('lasttimeStamp', e.target.value)}
+                placeholder="Auto-generated if blank"
                 className="rounded-none mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Lyrics (KA)</Label>
+              <Textarea
+                data-testid="song-ka"
+                value={formData.songKA || ''}
+                onChange={(e) => handleInputChange('songKA', e.target.value)}
+                placeholder="ಸಾಹಿತ್ಯ"
+                className="rounded-none mt-1"
+                rows={5}
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Lyrics (TE)</Label>
+              <Textarea
+                data-testid="song-te"
+                value={formData.songTE || ''}
+                onChange={(e) => handleInputChange('songTE', e.target.value)}
+                placeholder="తెలుగు సాహిత్యం"
+                className="rounded-none mt-1"
+                rows={5}
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Lyrics (SN)</Label>
+              <Textarea
+                data-testid="song-sn"
+                value={formData.songSN || ''}
+                onChange={(e) => handleInputChange('songSN', e.target.value)}
+                placeholder="संस्कृत साहित्य"
+                className="rounded-none mt-1"
+                rows={5}
               />
             </div>
           </div>

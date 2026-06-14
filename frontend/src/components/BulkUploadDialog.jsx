@@ -14,6 +14,49 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
   const [dragActive, setDragActive] = useState(false);
   const [pastedText, setPastedText] = useState('');
 
+  // Canonical SongDetails schema (per spec). Maps incoming legacy/variant keys
+  // to the canonical camelCase keys.
+  const SONG_DETAILS_FIELDS = [
+    'songNameEN', 'songType', 'songTE', 'songNameTE', 'songNameKA',
+    'songGroup', 'songSN', 'lasttimeStamp', 'songArtist', 'songIcon',
+    'songNameSN', 'songKA', 'songid'
+  ];
+
+  const SONG_DETAILS_ALIASES = {
+    // canonical -> [accepted variants]
+    songNameEN: ['songNameEN', 'SongNameEN', 'songnameen', 'SONGNAMEEN'],
+    songNameKA: ['songNameKA', 'SongNameKA', 'SongNameKN', 'songNameKN'],
+    songNameTE: ['songNameTE', 'SongNameTE'],
+    songNameSN: ['songNameSN', 'SongNameSN', 'SongNameHI', 'songNameHI'],
+    songKA: ['songKA', 'SongKA', 'SongLyricsKN', 'SongLyricsKA'],
+    songTE: ['songTE', 'SongTE', 'SongLyricsTE'],
+    songSN: ['songSN', 'SongSN', 'SongLyricsHI', 'SongLyricsSN'],
+    songType: ['songType', 'SongType', 'SONGTYPE'],
+    songArtist: ['songArtist', 'SongArtist', 'ArtistName', 'ARTISTNAMEEN', 'ARTISTNAMEKN'],
+    songGroup: ['songGroup', 'SongGroup', 'CategoryName', 'CategoryNameEN', 'CategoryNameKN'],
+    songIcon: ['songIcon', 'SongIcon'],
+    lasttimeStamp: ['lasttimeStamp', 'lastTimeStamp', 'LastTimeStamp', 'lasttimestamp'],
+    songid: ['songid', 'SongID', 'SongId', 'songId', 'SONGID'],
+  };
+
+  const normalizeToSongDetails = (item) => {
+    const out = {};
+    for (const canonical of SONG_DETAILS_FIELDS) {
+      const variants = SONG_DETAILS_ALIASES[canonical] || [canonical];
+      for (const v of variants) {
+        if (item[v] !== undefined && item[v] !== null && item[v] !== '') {
+          out[canonical] = item[v];
+          break;
+        }
+      }
+      if (out[canonical] === undefined) {
+        // default empty values per schema
+        out[canonical] = canonical === 'songid' ? 0 : '';
+      }
+    }
+    return out;
+  };
+
   const processFile = async (file) => {
     const fileExtension = file.name.split('.').pop().toLowerCase();
     
@@ -92,23 +135,38 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
       data.forEach((item, index) => {
         const docRef = doc(collectionRef);
         
-        // Parse lasttimeStamp if provided
+        if (collectionName === 'SongDetails') {
+          // Normalize to canonical schema
+          const normalized = normalizeToSongDetails(item);
+          // Auto-assign songid if missing
+          if (!normalized.songid || normalized.songid === 0) {
+            normalized.songid = nextSongId + index;
+          }
+          // Default lasttimeStamp = now (DD-MM-YYYY HH:MM:SS) if missing
+          if (!normalized.lasttimeStamp) {
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            normalized.lasttimeStamp = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+          }
+          batch.set(docRef, normalized);
+          console.log(`Document ${index + 1} (songid: ${normalized.songid}):`, normalized);
+          return;
+        }
+
+        // Non-SongDetails: keep prior behaviour
         let itemTimestamp = new Date(baseTimestamp.getTime() + index);
         if (item.lasttimeStamp) {
           try {
             const parts = item.lasttimeStamp.split(' ');
             const dateParts = parts[0].split('-');
             const timeParts = parts[1]?.split(':') || ['00', '00', '00'];
-            
             const day = parseInt(dateParts[0]);
             const month = parseInt(dateParts[1]) - 1;
             const year = parseInt(dateParts[2]);
             const hour = parseInt(timeParts[0]);
             const minute = parseInt(timeParts[1]);
             const second = parseInt(timeParts[2]);
-            
             itemTimestamp = new Date(year, month, day, hour, minute, second);
-            console.log(`✅ Using lasttimeStamp for ${item.SongNameEN}: ${itemTimestamp.toISOString()}`);
           } catch (e) {
             console.warn('⚠️ Failed to parse lasttimeStamp:', item.lasttimeStamp, e);
           }
@@ -116,19 +174,13 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
         
         const itemWithTimestamp = {
           ...item,
-          songid: collectionName === 'SongDetails' ? (item.songid || nextSongId + index) : undefined,
-          PlayCount: item.PlayCount || 0,
           createdAt: itemTimestamp,
           updatedAt: itemTimestamp
         };
-        
-        // Remove undefined fields
         Object.keys(itemWithTimestamp).forEach(key => 
           itemWithTimestamp[key] === undefined && delete itemWithTimestamp[key]
         );
-        
         batch.set(docRef, itemWithTimestamp);
-        console.log(`Document ${index + 1} (songid: ${itemWithTimestamp.songid || 'N/A'}):`, itemWithTimestamp);
       });
 
       await batch.commit();
@@ -288,15 +340,22 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
                   data-testid="paste-textarea"
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
-                  placeholder='Paste your JSON array here. Example:
+                  placeholder='Paste your JSON array here. SongDetails schema:
 [
   {
-    "ArtistID": "abc123",
-    "ArtistName": "ಎಸ್.ಪಿ.ಬಾಲಸುಬ್ರಹ್ಮಣ್ಯಂ",
-    "CategoryID": "xyz789",
-    "CategoryName": "ಭಕ್ತಿ ಗೀತೆಗಳು",
-    "SongNameEN": "Om Namah Shivaya",
-    "NextSongCount": 1
+    "songNameEN": "",
+    "songType": "",
+    "songTE": "",
+    "songNameTE": "",
+    "songNameKA": "",
+    "songGroup": "",
+    "songSN": "",
+    "lasttimeStamp": "",
+    "songArtist": "",
+    "songIcon": "",
+    "songNameSN": "",
+    "songKA": "",
+    "songid": 0
   }
 ]'
                   className="rounded-none min-h-[300px] font-mono text-xs"
