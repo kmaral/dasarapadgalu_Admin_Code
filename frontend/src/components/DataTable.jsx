@@ -4,17 +4,20 @@ import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit, Trash2, Loader2 } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export function DataTable({ collectionName, onEditDocument }) {
+export function DataTable({ collectionName, onEditDocument, onDocumentCountChange, onDocumentsChange }) {
   const [documents, setDocuments] = useState([]);
+  const [sortedDocuments, setSortedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [columns, setColumns] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
+  const [sortBy, setSortBy] = useState('id-desc');
 
   useEffect(() => {
     if (!collectionName) return;
@@ -29,6 +32,8 @@ export function DataTable({ collectionName, onEditDocument }) {
         }));
         
         setDocuments(docs);
+        onDocumentCountChange?.(docs.length);
+        onDocumentsChange?.(docs);
         
         if (docs.length > 0) {
           const allKeys = new Set();
@@ -50,7 +55,28 @@ export function DataTable({ collectionName, onEditDocument }) {
     );
 
     return () => unsubscribe();
-  }, [collectionName]);
+  }, [collectionName, onDocumentCountChange]);
+
+  useEffect(() => {
+    const sorted = [...documents].sort((a, b) => {
+      const [field, order] = sortBy.split('-');
+      
+      let aVal = a[field];
+      let bVal = b[field];
+      
+      // Handle different data types
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+      
+      if (order === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+    
+    setSortedDocuments(sorted);
+  }, [documents, sortBy]);
 
   const confirmDelete = (docId) => {
     setDocToDelete(docId);
@@ -92,8 +118,36 @@ export function DataTable({ collectionName, onEditDocument }) {
     );
   }
 
+  // Get sortable columns (timestamp, date, id, or any field with these keywords)
+  const sortableColumns = ['id', ...columns.filter(col => 
+    col.toLowerCase().includes('time') || 
+    col.toLowerCase().includes('date') || 
+    col.toLowerCase().includes('created') ||
+    col.toLowerCase().includes('updated')
+  )];
+
   return (
     <>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ArrowUpDown className="w-4 h-4 text-zinc-500" />
+          <span className="text-sm text-zinc-600" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>Sort by:</span>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger data-testid="sort-select" className="w-[200px] rounded-none">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sortableColumns.map(col => (
+                <div key={col}>
+                  <SelectItem value={`${col}-desc`}>{col} (Newest first)</SelectItem>
+                  <SelectItem value={`${col}-asc`}>{col} (Oldest first)</SelectItem>
+                </div>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="border border-zinc-200 rounded-sm bg-white overflow-x-auto">
         <Table>
           <TableHeader>
@@ -108,7 +162,7 @@ export function DataTable({ collectionName, onEditDocument }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {documents.map((doc) => (
+            {sortedDocuments.map((doc) => (
               <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className="hover:bg-zinc-50">
                 <TableCell className="font-mono text-xs text-zinc-600">{doc.id}</TableCell>
                 {columns.slice(0, 8).map((col) => (

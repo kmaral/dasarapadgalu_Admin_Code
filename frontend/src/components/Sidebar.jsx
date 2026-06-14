@@ -1,4 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Database } from 'lucide-react';
+import { collection, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 const COLLECTIONS = [
   'ArtistCollections',
@@ -10,6 +13,27 @@ const COLLECTIONS = [
 ];
 
 export function Sidebar({ selectedCollection, onSelectCollection }) {
+  const [collectionCounts, setCollectionCounts] = useState({});
+
+  useEffect(() => {
+    const unsubscribes = COLLECTIONS.map(collectionName => {
+      return onSnapshot(
+        collection(db, collectionName),
+        (snapshot) => {
+          setCollectionCounts(prev => ({
+            ...prev,
+            [collectionName]: snapshot.size
+          }));
+        },
+        (error) => {
+          console.error(`Error loading ${collectionName} count:`, error);
+        }
+      );
+    });
+
+    return () => unsubscribes.forEach(unsub => unsub());
+  }, []);
+
   return (
     <aside className="w-64 fixed h-screen border-r border-zinc-200 bg-zinc-50 flex flex-col">
       <div className="h-16 border-b border-zinc-200 px-6 flex items-center">
@@ -19,24 +43,33 @@ export function Sidebar({ selectedCollection, onSelectCollection }) {
         </h1>
       </div>
       
-      <nav className="flex-1 px-4 py-6">
+      <nav className="flex-1 px-4 py-6 overflow-y-auto">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-4 px-2">
           Collections
         </p>
         <ul className="space-y-1">
-          {COLLECTIONS.map((collection) => (
-            <li key={collection}>
+          {COLLECTIONS.map((collectionName) => (
+            <li key={collectionName}>
               <button
-                data-testid={`sidebar-nav-${collection.toLowerCase()}`}
-                onClick={() => onSelectCollection(collection)}
-                className={`w-full text-left px-4 py-2 text-sm rounded-none transition-colors duration-150 ${
-                  selectedCollection === collection
+                data-testid={`sidebar-nav-${collectionName.toLowerCase()}`}
+                onClick={() => onSelectCollection(collectionName)}
+                className={`w-full text-left px-4 py-2 text-sm rounded-none transition-colors duration-150 flex items-center justify-between ${
+                  selectedCollection === collectionName
                     ? 'bg-[#002FA7] text-white font-medium'
                     : 'text-zinc-700 hover:bg-zinc-100 hover:text-zinc-900'
                 }`}
                 style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
               >
-                {collection}
+                <span className="truncate">{collectionName}</span>
+                <span 
+                  className={`ml-2 px-2 py-0.5 text-xs font-mono rounded ${
+                    selectedCollection === collectionName
+                      ? 'bg-white/20 text-white'
+                      : 'bg-zinc-200 text-zinc-600'
+                  }`}
+                >
+                  {collectionCounts[collectionName] ?? '...'}
+                </span>
               </button>
             </li>
           ))}
