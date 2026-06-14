@@ -1,0 +1,26 @@
+[
+  {
+    "CategoryNameEN": "Devotional",
+    "CategoryNameKN": "ಭಕ್ತಿ ಗೀತೆಗಳು",
+    "CategoryNameHI": "भक्ति गीत",
+    "CategoryNameTE": "భక్తి పాటలు",
+    "CategoryIcon": "https://example.com/icons/devotional.png",
+    "DisplayOrder": 1
+  },
+  {
+    "CategoryNameEN": "Classical",
+    "CategoryNameKN": "ಶಾಸ್ತ್ರೀಯ ಸಂಗೀತ",
+    "CategoryNameHI": "शास्त्रीय संगीत",
+    "CategoryNameTE": "క్లాసికల్ సంగీతం",
+    "CategoryIcon": "https://example.com/icons/classical.png",
+    "DisplayOrder": 2
+  },
+  {
+    "CategoryNameEN": "Folk Songs",
+    "CategoryNameKN": "ಜಾನಪದ ಗೀತೆಗಳು",
+    "CategoryNameHI": "लोक गीत",
+    "CategoryNameTE": "జానపద పాటలు",
+    "CategoryIcon": "https://example.com/icons/folk.png",
+    "DisplayOrder": 3
+  }
+]

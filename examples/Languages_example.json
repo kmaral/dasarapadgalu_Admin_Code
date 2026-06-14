@@ -1,0 +1,26 @@
+[
+  {
+    "LanguageNameEN": "Kannada",
+    "LanguageNameNative": "ಕನ್ನಡ",
+    "LanguageCode": "kn",
+    "IsActive": true
+  },
+  {
+    "LanguageNameEN": "Hindi",
+    "LanguageNameNative": "हिन्दी",
+    "LanguageCode": "hi",
+    "IsActive": true
+  },
+  {
+    "LanguageNameEN": "Telugu",
+    "LanguageNameNative": "తెలుగు",
+    "LanguageCode": "te",
+    "IsActive": true
+  },
+  {
+    "LanguageNameEN": "Tamil",
+    "LanguageNameNative": "தமிழ்",
+    "LanguageCode": "ta",
+    "IsActive": false
+  }
+]

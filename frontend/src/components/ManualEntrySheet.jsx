@@ -89,36 +89,89 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
       case 'SongDetails':
         return (
           <div className="space-y-4">
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Select Artist</Label>
-              <Select value={formData.ArtistID || ''} onValueChange={(val) => handleInputChange('ArtistID', val)}>
-                <SelectTrigger data-testid="artist-select" className="rounded-none mt-1">
-                  <SelectValue placeholder="Choose an artist..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {artists.map((artist) => (
-                    <SelectItem key={artist.id} value={artist.id}>
-                      {artist.ARTISTSIGNEN || artist.ARTISTNAMEEN || artist.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Select Artist</Label>
+                <Select 
+                  value={formData.ArtistID || ''} 
+                  onValueChange={(val) => {
+                    const selectedArtist = artists.find(a => a.id === val);
+                    handleInputChange('ArtistID', val);
+                    handleInputChange('ArtistName', selectedArtist?.ARTISTNAMEEN || selectedArtist?.ARTISTSIGNEN || '');
+                  }}
+                >
+                  <SelectTrigger data-testid="artist-select" className="rounded-none mt-1">
+                    <SelectValue placeholder="Choose an artist..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {artists.map((artist) => (
+                      <SelectItem key={artist.id} value={artist.id}>
+                        {artist.ARTISTNAMEEN || artist.ARTISTSIGNEN || artist.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Artist Name</Label>
+                <Input
+                  data-testid="artist-name"
+                  value={formData.ArtistName || ''}
+                  onChange={(e) => handleInputChange('ArtistName', e.target.value)}
+                  placeholder="Artist name"
+                  className="rounded-none mt-1"
+                  readOnly
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Select Category</Label>
+                <Select 
+                  value={formData.CategoryID || ''} 
+                  onValueChange={(val) => {
+                    const selectedCategory = categories.find(c => c.id === val);
+                    handleInputChange('CategoryID', val);
+                    handleInputChange('CategoryName', selectedCategory?.CategoryNameEN || '');
+                  }}
+                >
+                  <SelectTrigger data-testid="category-select" className="rounded-none mt-1">
+                    <SelectValue placeholder="Choose a category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.CategoryNameEN || cat.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Category Name</Label>
+                <Input
+                  data-testid="category-name"
+                  value={formData.CategoryName || ''}
+                  onChange={(e) => handleInputChange('CategoryName', e.target.value)}
+                  placeholder="Category name"
+                  className="rounded-none mt-1"
+                  readOnly
+                />
+              </div>
             </div>
 
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Select Category</Label>
-              <Select value={formData.CategoryID || ''} onValueChange={(val) => handleInputChange('CategoryID', val)}>
-                <SelectTrigger data-testid="category-select" className="rounded-none mt-1">
-                  <SelectValue placeholder="Choose a category..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.CategoryNameEN || cat.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song Group</Label>
+              <Input
+                data-testid="song-group"
+                value={formData.SongGroup || ''}
+                onChange={(e) => handleInputChange('SongGroup', e.target.value)}
+                placeholder="Enter song group"
+                className="rounded-none mt-1"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -168,36 +221,13 @@ export function ManualEntrySheet({ isOpen, onClose, collectionName, editingDoc }
             </div>
 
             <div>
-              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Max Song Count</Label>
+              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Next Song Count</Label>
               <Input
-                data-testid="max-song-count"
+                data-testid="next-song-count"
                 type="number"
-                value={formData.MaxSongCount || ''}
-                onChange={(e) => handleInputChange('MaxSongCount', parseInt(e.target.value) || 0)}
-                placeholder="Enter max song count"
-                className="rounded-none mt-1"
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Song URL</Label>
-              <Input
-                data-testid="song-url"
-                value={formData.SongURL || ''}
-                onChange={(e) => handleInputChange('SongURL', e.target.value)}
-                placeholder="Enter song file URL"
-                className="rounded-none mt-1"
-              />
-            </div>
-
-            <div>
-              <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Duration (seconds)</Label>
-              <Input
-                data-testid="duration"
-                type="number"
-                value={formData.Duration || ''}
-                onChange={(e) => handleInputChange('Duration', parseInt(e.target.value) || 0)}
-                placeholder="Song duration"
+                value={formData.NextSongCount || ''}
+                onChange={(e) => handleInputChange('NextSongCount', parseInt(e.target.value) || 0)}
+                placeholder="Enter next song count"
                 className="rounded-none mt-1"
               />
             </div>

@@ -1,0 +1,38 @@
+[
+  {
+    "ArtistID": "0QNzLKiDxIGA7VS",
+    "ArtistName": "S. P. Balasubrahmanyam",
+    "CategoryID": "0f7kcxDYnvnyzStAx",
+    "CategoryName": "Devotional",
+    "SongGroup": "Morning Bhajans",
+    "SongNameEN": "Om Namah Shivaya",
+    "SongNameKN": "ಓಂ ನಮಃ ಶಿವಾಯ",
+    "SongNameHI": "ॐ नमः शिवाय",
+    "SongNameTE": "ఓం నమః శివాయ",
+    "NextSongCount": 1
+  },
+  {
+    "ArtistID": "1CDRlNssduu66BicLsHd",
+    "ArtistName": "K. S. Chithra",
+    "CategoryID": "1YOAIObiYq7ScJVKBecO0",
+    "CategoryName": "Classical",
+    "SongGroup": "Carnatic",
+    "SongNameEN": "Jagadodharana",
+    "SongNameKN": "ಜಗದೋದ್ಧಾರಣ",
+    "SongNameHI": "जगदोद्धारण",
+    "SongNameTE": "జగదోద్ధారణ",
+    "NextSongCount": 2
+  },
+  {
+    "ArtistID": "23qtp5MybaKgTKGoHmaM",
+    "ArtistName": "Purandara Dasa",
+    "CategoryID": "3xvPXrqPKbsGnrltTGwY",
+    "CategoryName": "Folk",
+    "SongGroup": "Festival Songs",
+    "SongNameEN": "Venkateshwara Suprabhatam",
+    "SongNameKN": "ವೆಂಕಟೇಶ್ವರ ಸುಪ್ರಭಾತಂ",
+    "SongNameHI": "वेंकटेश्वर सुप्रभातम्",
+    "SongNameTE": "వెంకటేశ్వర సుప్రభాతం",
+    "NextSongCount": 5
+  }
+]
