@@ -1,61 +1,118 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, limit, onSnapshot, deleteDoc, doc, orderBy, startAfter, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit, Trash2, ArrowUpDown } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const PAGE_SIZE = 50;
 
 export function DataTable({ collectionName, onEditDocument, onDocumentCountChange, onDocumentsChange }) {
   const [documents, setDocuments] = useState([]);
   const [sortedDocuments, setSortedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [columns, setColumns] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
   const [sortBy, setSortBy] = useState('id-desc');
+  const [hasMore, setHasMore] = useState(true);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     if (!collectionName) return;
     
     setLoading(true);
-    const unsubscribe = onSnapshot(
+    setDocuments([]);
+    setHasMore(true);
+    setLastDoc(null);
+    
+    const q = query(
       collection(db, collectionName),
-      (snapshot) => {
-        const docs = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setDocuments(docs);
-        onDocumentCountChange?.(docs.length);
-        onDocumentsChange?.(docs);
-        
-        if (docs.length > 0) {
-          const allKeys = new Set();
-          docs.forEach(doc => {
-            Object.keys(doc).forEach(key => allKeys.add(key));
-          });
-          setColumns(Array.from(allKeys).filter(key => key !== 'id'));
-        } else {
-          setColumns([]);
-        }
-        
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Firestore error:', error);
-        toast.error('Failed to load documents');
-        setLoading(false);
-      }
+      orderBy('__name__'),
+      limit(PAGE_SIZE)
     );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setDocuments(docs);
+      onDocumentsChange?.(docs);
+      
+      if (snapshot.docs.length > 0) {
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMore(snapshot.docs.length === PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+      
+      if (docs.length > 0) {
+        const allKeys = new Set();
+        docs.forEach(doc => {
+          Object.keys(doc).forEach(key => allKeys.add(key));
+        });
+        setColumns(Array.from(allKeys).filter(key => key !== 'id'));
+      } else {
+        setColumns([]);
+      }
+      
+      setLoading(false);
+    }, (error) => {
+      console.error('Firestore error:', error);
+      toast.error('Failed to load documents');
+      setLoading(false);
+    });
+
+    getDocs(collection(db, collectionName)).then((snap) => {
+      setTotalCount(snap.size);
+      onDocumentCountChange?.(snap.size);
+    });
 
     return () => unsubscribe();
-  }, [collectionName, onDocumentCountChange]);
+  }, [collectionName]);
+
+  const loadMore = async () => {
+    if (!lastDoc || loadingMore) return;
+    
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, collectionName),
+        orderBy('__name__'),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+      
+      const snapshot = await getDocs(q);
+      const newDocs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setDocuments(prev => [...prev, ...newDocs]);
+      
+      if (snapshot.docs.length > 0) {
+        setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMore(snapshot.docs.length === PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error('Load more error:', error);
+      toast.error('Failed to load more documents');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     const sorted = [...documents].sort((a, b) => {
@@ -64,7 +121,6 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       let aVal = a[field];
       let bVal = b[field];
       
-      // Handle different data types
       if (typeof aVal === 'string') aVal = aVal.toLowerCase();
       if (typeof bVal === 'string') bVal = bVal.toLowerCase();
       
@@ -89,6 +145,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     try {
       await deleteDoc(doc(db, collectionName, docToDelete));
       toast.success('Document deleted successfully');
+      setDocuments(prev => prev.filter(d => d.id !== docToDelete));
     } catch (error) {
       console.error('Delete error:', error);
       toast.error(`Failed to delete document: ${error.message}`);
@@ -118,7 +175,6 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     );
   }
 
-  // Get sortable columns (timestamp, date, id, or any field with these keywords)
   const sortableColumns = ['id', ...columns.filter(col => 
     col.toLowerCase().includes('time') || 
     col.toLowerCase().includes('date') || 
@@ -145,6 +201,10 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
               ))}
             </SelectContent>
           </Select>
+        </div>
+        
+        <div className="text-sm text-zinc-600" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+          Showing {documents.length} of {totalCount} documents
         </div>
       </div>
 
@@ -205,6 +265,27 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
           </TableBody>
         </Table>
       </div>
+
+      {hasMore && (
+        <div className="mt-6 text-center">
+          <Button
+            data-testid="load-more-button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-none px-8"
+            style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+          >
+            {loadingMore ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              `Load More (${totalCount - documents.length} remaining)`
+            )}
+          </Button>
+        </div>
+      )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="rounded-none">
