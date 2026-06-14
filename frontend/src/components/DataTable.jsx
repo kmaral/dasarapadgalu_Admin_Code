@@ -46,7 +46,7 @@ function CellValue({ value, columnName }) {
   );
 }
 
-export function DataTable({ collectionName, onEditDocument, onDocumentCountChange, onDocumentsChange }) {
+export function DataTable({ collectionName, onEditDocument, onDocumentCountChange }) {
   const [documents, setDocuments] = useState([]);
   const [sortedDocuments, setSortedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +97,6 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       }));
       
       setDocuments(docs);
-      onDocumentsChange?.(docs);
       
       if (snapshot.docs.length > 0) {
         setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
@@ -133,7 +132,6 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
           }));
           
           setDocuments(docs);
-          onDocumentsChange?.(docs);
           
           if (snapshot.docs.length > 0) {
             setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
