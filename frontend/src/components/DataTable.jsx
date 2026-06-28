@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X, AlertCircle, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -104,6 +105,8 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [sortBy, setSortBy] = useState(getDefaultSort(collectionName));
   const [hasMore, setHasMore] = useState(true);
   const [lastDoc, setLastDoc] = useState(null);
@@ -156,9 +159,10 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     persistColumnOrder(columns);
   };
 
-  // Reset sort when switching collections
+  // Reset sort and selection when switching collections
   useEffect(() => {
     setSortBy(getDefaultSort(collectionName));
+    setSelectedIds(new Set());
   }, [collectionName]);
 
   // Load initial data.
@@ -405,17 +409,69 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
 
   const handleDelete = async () => {
     if (!docToDelete) return;
-    
+
     try {
       await deleteDoc(doc(db, collectionName, docToDelete));
       toast.success('Document deleted successfully');
       setDocuments(prev => prev.filter(d => d.id !== docToDelete));
+      setSelectedIds(prev => { const next = new Set(prev); next.delete(docToDelete); return next; });
     } catch (error) {
       console.error('Delete error:', error);
       toast.error(`Failed to delete document: ${error.message}`);
     } finally {
       setDeleteDialogOpen(false);
       setDocToDelete(null);
+    }
+  };
+
+  const handleSelectRow = (id, checked) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+
+  const allDisplaySelected = displayDocuments.length > 0 && displayDocuments.every(d => selectedIds.has(d.id));
+  const someDisplaySelected = displayDocuments.some(d => selectedIds.has(d.id));
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        displayDocuments.forEach(d => next.add(d.id));
+        return next;
+      });
+    } else {
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        displayDocuments.forEach(d => next.delete(d.id));
+        return next;
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      // Firestore writeBatch supports up to 500 ops per batch
+      const BATCH_LIMIT = 500;
+      for (let i = 0; i < ids.length; i += BATCH_LIMIT) {
+        const batch = writeBatch(db);
+        ids.slice(i, i + BATCH_LIMIT).forEach(id => batch.delete(doc(db, collectionName, id)));
+        await batch.commit();
+      }
+      toast.success(`Deleted ${ids.length} document${ids.length !== 1 ? 's' : ''} successfully`);
+      setDocuments(prev => prev.filter(d => !selectedIds.has(d.id)));
+      setAllDocuments(prev => prev.filter(d => !selectedIds.has(d.id)));
+      setSelectedIds(new Set());
+    } catch (error) {
+      console.error('Bulk delete error:', error);
+      toast.error(`Failed to delete documents: ${error.message}`);
+    } finally {
+      setBulkDeleteDialogOpen(false);
     }
   };
 
@@ -523,6 +579,18 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
           </div>
           
           <div className="flex items-center gap-3">
+            {selectedIds.size > 0 && (
+              <Button
+                data-testid="bulk-delete-button"
+                variant="destructive"
+                className="rounded-none h-9"
+                style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+                onClick={() => setBulkDeleteDialogOpen(true)}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Selected ({selectedIds.size})
+              </Button>
+            )}
             <div className="text-sm text-zinc-600" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
               {searchQuery ? `Showing ${displayDocuments.length} of ${totalCount}` : `Showing ${documents.length} of ${totalCount} documents`}
             </div>
@@ -594,7 +662,16 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
         <Table>
           <TableHeader>
             <TableRow className="bg-zinc-50 hover:bg-zinc-50">
-              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-0 bg-zinc-50 z-10 w-16 text-center" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>#</TableHead>
+              <TableHead className="sticky left-0 bg-zinc-50 z-10 w-10 text-center">
+                <Checkbox
+                  data-testid="select-all-checkbox"
+                  checked={allDisplaySelected}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Select all"
+                  className={someDisplaySelected && !allDisplaySelected ? 'opacity-50' : ''}
+                />
+              </TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-10 bg-zinc-50 z-10 w-16 text-center" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>#</TableHead>
               <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
               {columnOrder.map((col) => (
                 <TableHead key={col} className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
@@ -606,15 +683,23 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
           </TableHeader>
           <TableBody>
             {displayDocuments.map((doc, index) => (
-              <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className="hover:bg-zinc-50">
-                <TableCell className="font-semibold text-sm text-zinc-700 sticky left-0 bg-white z-10 text-center">{index + 1}</TableCell>
+              <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className={`hover:bg-zinc-50 ${selectedIds.has(doc.id) ? 'bg-blue-50' : ''}`}>
+                <TableCell className="sticky left-0 z-10 text-center" style={{ backgroundColor: selectedIds.has(doc.id) ? 'rgb(239 246 255)' : 'white' }}>
+                  <Checkbox
+                    data-testid={`select-row-${doc.id}`}
+                    checked={selectedIds.has(doc.id)}
+                    onCheckedChange={(checked) => handleSelectRow(doc.id, checked)}
+                    aria-label={`Select row ${index + 1}`}
+                  />
+                </TableCell>
+                <TableCell className="font-semibold text-sm text-zinc-700 sticky left-10 z-10 text-center" style={{ backgroundColor: selectedIds.has(doc.id) ? 'rgb(239 246 255)' : 'white' }}>{index + 1}</TableCell>
                 <TableCell className="font-mono text-xs text-zinc-600">{doc.id}</TableCell>
                 {columnOrder.map((col) => (
                   <TableCell key={col} className="text-sm text-zinc-800 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
                     <CellValue value={doc[col]} columnName={col} />
                   </TableCell>
                 ))}
-                <TableCell className="text-right sticky right-0 bg-white z-10">
+                <TableCell className="text-right sticky right-0 z-10" style={{ backgroundColor: selectedIds.has(doc.id) ? 'rgb(239 246 255)' : 'white' }}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -687,6 +772,27 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
               className="bg-red-600 hover:bg-red-700 text-white rounded-none"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-none">
+          <AlertDialogHeader>
+            <AlertDialogTitle style={{ fontFamily: 'Chivo, sans-serif' }}>Delete {selectedIds.size} Record{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              You are about to permanently delete <span className="font-semibold text-zinc-900">{selectedIds.size} selected record{selectedIds.size !== 1 ? 's' : ''}</span>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-none">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="confirm-bulk-delete-button"
+              onClick={handleBulkDelete}
+              className="bg-red-600 hover:bg-red-700 text-white rounded-none"
+            >
+              Delete {selectedIds.size} Record{selectedIds.size !== 1 ? 's' : ''}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
