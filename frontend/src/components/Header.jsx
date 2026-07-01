@@ -4,28 +4,28 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 export function Header({ collectionName, onOpenManualEntry, onOpenBulkUpload, onExport, documentCount }) {
   return (
-    <header className="h-16 border-b border-zinc-200 px-8 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-40">
+    <header className="h-16 border-b border-zinc-200/70 px-8 flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-40 font-body">
       <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-400 mb-0.5">
+          Collections
+        </p>
         <div className="flex items-center gap-3">
-          <h2 className="text-2xl tracking-tight font-bold text-zinc-900" style={{ fontFamily: 'Chivo, sans-serif' }}>
+          <h2 className="text-xl tracking-tight font-bold text-zinc-900 font-heading">
             {collectionName}
           </h2>
-          <span className="px-3 py-1 text-xs font-mono bg-zinc-100 text-zinc-600 rounded">
+          <span className="px-2.5 py-0.5 text-xs font-mono bg-zinc-100 text-zinc-600 rounded-full">
             {documentCount} {documentCount === 1 ? 'document' : 'documents'}
           </span>
         </div>
-        <p className="text-xs text-zinc-500 mt-0.5" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-          Manage documents in real-time
-        </p>
       </div>
-      
+
       <div className="flex items-center gap-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               data-testid="export-button"
-              className="bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-none px-6 py-2 transition-colors"
-              style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+              variant="outline"
+              className="rounded-lg px-5"
             >
               <Download className="w-4 h-4 mr-2" />
               Export
@@ -40,12 +40,12 @@ export function Header({ collectionName, onOpenManualEntry, onOpenBulkUpload, on
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        
+
         <Button
           data-testid="bulk-upload-button"
           onClick={onOpenBulkUpload}
-          className="bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-none px-6 py-2 transition-colors"
-          style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+          variant="outline"
+          className="rounded-lg px-5"
         >
           <Upload className="w-4 h-4 mr-2" />
           Bulk Upload
@@ -53,8 +53,7 @@ export function Header({ collectionName, onOpenManualEntry, onOpenBulkUpload, on
         <Button
           data-testid="add-document-button"
           onClick={onOpenManualEntry}
-          className="bg-[#002FA7] text-white hover:bg-[#002277] rounded-none px-6 py-2 font-medium transition-colors focus:ring-2 focus:ring-offset-2 focus:ring-[#002FA7]"
-          style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+          className="bg-primary text-white hover:bg-primary/90 rounded-lg px-5 font-medium shadow-sm shadow-primary/30"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Document
@@ -63,3 +62,4 @@ export function Header({ collectionName, onOpenManualEntry, onOpenBulkUpload, on
     </header>
   );
 }
+

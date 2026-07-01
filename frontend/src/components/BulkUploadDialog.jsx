@@ -19,7 +19,7 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
   const SONG_DETAILS_FIELDS = [
     'songNameEN', 'songType', 'songTE', 'songNameTE', 'songNameKA',
     'songGroup', 'songSN', 'lasttimeStamp', 'songArtist', 'songIcon',
-    'songNameSN', 'songKA', 'songid'
+    'songNameSN', 'songKA', 'youtubeLinks', 'songid'
   ];
 
   const SONG_DETAILS_ALIASES = {
@@ -35,8 +35,19 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
     songArtist: ['songArtist', 'SongArtist', 'ArtistName', 'ARTISTNAMEEN', 'ARTISTNAMEKN'],
     songGroup: ['songGroup', 'SongGroup', 'CategoryName', 'CategoryNameEN', 'CategoryNameKN'],
     songIcon: ['songIcon', 'SongIcon'],
+    youtubeLinks: ['youtubeLinks', 'YoutubeLinks', 'YouTubeLinks', 'youtube_links', 'YOUTUBELINKS'],
     lasttimeStamp: ['lasttimeStamp', 'lastTimeStamp', 'LastTimeStamp', 'lasttimestamp'],
     songid: ['songid', 'SongID', 'SongId', 'songId', 'SONGID'],
+  };
+
+  // youtubeLinks is stored as a string array. CSV cells arrive as a single
+  // delimited string; JSON uploads may already provide an array.
+  const parseYoutubeLinks = (value) => {
+    if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter(Boolean);
+    if (typeof value === 'string') {
+      return value.split(/[\n,;|]/).map((v) => v.trim()).filter(Boolean);
+    }
+    return [];
   };
 
   const normalizeToSongDetails = (item) => {
@@ -51,9 +62,10 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
       }
       if (out[canonical] === undefined) {
         // default empty values per schema
-        out[canonical] = canonical === 'songid' ? 0 : '';
+        out[canonical] = canonical === 'songid' ? 0 : (canonical === 'youtubeLinks' ? [] : '');
       }
     }
+    out.youtubeLinks = parseYoutubeLinks(out.youtubeLinks);
     return out;
   };
 
@@ -264,13 +276,13 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] rounded-none">
+      <DialogContent className="sm:max-w-[700px] rounded-xl font-body">
         <DialogHeader>
-          <DialogTitle className="text-2xl tracking-tight font-bold text-zinc-900" style={{ fontFamily: 'Chivo, sans-serif' }}>
+          <DialogTitle className="text-2xl tracking-tight font-bold text-zinc-900 font-heading">
             Bulk Upload
           </DialogTitle>
-          <DialogDescription style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-            Upload multiple documents to <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded">{collectionName}</span>
+          <DialogDescription>
+            Upload multiple documents to <span className="font-mono text-xs bg-zinc-100 px-2 py-1 rounded-full">{collectionName}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -292,14 +304,16 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
               onDrop={handleDrop}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              className={`border-2 border-dashed rounded-sm py-12 text-center transition-colors duration-150 ${
+              className={`border-2 border-dashed rounded-xl py-12 text-center transition-colors duration-150 ${
                 dragActive
-                  ? 'border-[#002FA7] bg-blue-50'
+                  ? 'border-primary bg-primary/5'
                   : 'border-zinc-300 bg-zinc-50 hover:bg-zinc-100'
               }`}
             >
-              <FileText className="w-12 h-12 mx-auto text-zinc-400 mb-4" />
-              <p className="text-sm text-zinc-600 mb-2" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              <div className={`w-14 h-14 mx-auto rounded-full flex items-center justify-center mb-4 transition-colors duration-150 ${dragActive ? 'bg-primary/15' : 'bg-white border border-zinc-200'}`}>
+                <FileText className={`w-6 h-6 ${dragActive ? 'text-primary' : 'text-zinc-400'}`} />
+              </div>
+              <p className="text-sm text-zinc-600 mb-2">
                 Drag and drop your file here, or
               </p>
               <label>
@@ -314,8 +328,7 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
                 <Button
                   type="button"
                   asChild
-                  className="bg-[#002FA7] text-white hover:bg-[#002277] rounded-none px-6"
-                  style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+                  className="bg-primary text-white hover:bg-primary/90 rounded-lg px-6 shadow-sm shadow-primary/30"
                   disabled={uploading}
                 >
                   <span className="cursor-pointer">
@@ -324,7 +337,7 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
                   </span>
                 </Button>
               </label>
-              <p className="text-xs text-zinc-500 mt-4" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              <p className="text-xs text-zinc-500 mt-4">
                 Supported formats: CSV, JSON
               </p>
             </div>
@@ -333,7 +346,7 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
           <TabsContent value="paste" className="mt-6">
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 mb-2 block" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                <label className="text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500 mb-2 block">
                   Paste JSON or CSV data
                 </label>
                 <Textarea
@@ -355,11 +368,11 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
     "songIcon": "",
     "songNameSN": "",
     "songKA": "",
+    "youtubeLinks": [],
     "songid": 0
   }
 ]'
-                  className="rounded-none min-h-[300px] font-mono text-xs"
-                  style={{ fontFamily: 'IBM Plex Mono, monospace' }}
+                  className="rounded-lg min-h-[300px] font-mono text-xs"
                 />
               </div>
 
@@ -367,8 +380,8 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
                 <Button
                   type="button"
                   onClick={() => setPastedText('')}
-                  className="flex-1 bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-none"
-                  style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+                  variant="outline"
+                  className="flex-1 rounded-lg"
                   disabled={uploading}
                 >
                   Clear
@@ -378,14 +391,13 @@ export function BulkUploadDialog({ isOpen, onClose, collectionName }) {
                   data-testid="upload-pasted-data"
                   onClick={handlePasteUpload}
                   disabled={uploading || !pastedText.trim()}
-                  className="flex-1 bg-[#002FA7] text-white hover:bg-[#002277] rounded-none font-medium"
-                  style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+                  className="flex-1 bg-primary text-white hover:bg-primary/90 rounded-lg font-medium shadow-sm shadow-primary/30"
                 >
                   {uploading ? 'Uploading...' : 'Upload Data'}
                 </Button>
               </div>
 
-              <p className="text-xs text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              <p className="text-xs text-zinc-500">
                 💡 Tip: See <code className="bg-zinc-100 px-1 rounded">/app/examples/</code> for sample JSON files
               </p>
             </div>

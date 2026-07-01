@@ -124,31 +124,38 @@ function App() {
         onSelectView={setView}
       />
       
-      <div className="ml-64 flex-1 min-h-screen bg-white">
-        {view === 'manage' ? (
-          <>
-            <Header
-              collectionName={selectedCollection}
-              documentCount={documentCount}
-              onOpenManualEntry={() => setManualEntryOpen(true)}
-              onOpenBulkUpload={() => setBulkUploadOpen(true)}
-              onExport={handleExport}
-            />
-            <main className="p-8">
-              <DataTable
+      <div className="ml-64 flex-1 min-h-screen bg-background relative">
+        <div className="pointer-events-none fixed top-0 left-64 right-0 h-96 overflow-hidden z-0">
+          <div className="absolute -top-24 right-10 w-[420px] h-[420px] rounded-full bg-primary/[0.06] blur-3xl" />
+          <div className="absolute -top-32 left-1/3 w-[320px] h-[320px] rounded-full bg-violet-400/[0.06] blur-3xl" />
+        </div>
+        <div className="relative z-10">
+          {view === 'manage' ? (
+            <>
+              <Header
                 collectionName={selectedCollection}
-                onEditDocument={handleEditDocument}
-                onDocumentCountChange={(count) => {
-                  setDocumentCount(count);
-                }}
+                documentCount={documentCount}
+                onOpenManualEntry={() => setManualEntryOpen(true)}
+                onOpenBulkUpload={() => setBulkUploadOpen(true)}
+                onExport={handleExport}
               />
+              <main className="p-8">
+                <DataTable
+                  collectionName={selectedCollection}
+                  onEditDocument={handleEditDocument}
+                  onAddDocument={() => setManualEntryOpen(true)}
+                  onDocumentCountChange={(count) => {
+                    setDocumentCount(count);
+                  }}
+                />
+              </main>
+            </>
+          ) : (
+            <main className="p-8">
+              <BrowseSongs />
             </main>
-          </>
-        ) : (
-          <main className="p-8">
-            <BrowseSongs />
-          </main>
-        )}
+          )}
+        </div>
       </div>
 
       <ManualEntrySheet

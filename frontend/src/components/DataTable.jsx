@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X, AlertCircle, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, ArrowUpDown, Loader2, Search, X, AlertCircle, Settings2, ArrowUp, ArrowDown, Inbox, Plus, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import Fuse from 'fuse.js';
@@ -77,16 +77,14 @@ function CellValue({ value, columnName }) {
         <button
           type="button"
           data-testid={`cell-popover-${columnName}`}
-          className="text-left text-[#002FA7] hover:underline focus:outline-none"
-          style={{ fontFamily: 'inherit' }}
+          className="text-left text-primary hover:underline focus:outline-none"
         >
           {raw.slice(0, CELL_TRUNCATE_LEN)}…
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="max-w-[420px] max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-sm rounded-sm border-zinc-300"
-        style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+        className="max-w-[420px] max-h-[420px] overflow-auto whitespace-pre-wrap break-words text-sm rounded-lg border-zinc-200 font-body"
       >
         <div className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 mb-2">{columnName}</div>
         {raw}
@@ -95,14 +93,16 @@ function CellValue({ value, columnName }) {
   );
 }
 
-export function DataTable({ collectionName, onEditDocument, onDocumentCountChange }) {
+export function DataTable({ collectionName, onEditDocument, onDocumentCountChange, onAddDocument }) {
   const [documents, setDocuments] = useState([]);
   const [sortedDocuments, setSortedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [columns, setColumns] = useState([]);
   const [columnOrder, setColumnOrder] = useState([]);
+  const [hiddenColumns, setHiddenColumns] = useState(new Set());
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false);
+  const [columnFilterText, setColumnFilterText] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [docToDelete, setDocToDelete] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -138,6 +138,15 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     } else {
       setColumnOrder(columns);
     }
+
+    const visKey = `columnHidden:${collectionName}`;
+    try {
+      const raw = localStorage.getItem(visKey);
+      const savedHidden = raw ? JSON.parse(raw) : [];
+      setHiddenColumns(new Set(Array.isArray(savedHidden) ? savedHidden.filter((c) => columns.includes(c)) : []));
+    } catch (e) {
+      setHiddenColumns(new Set());
+    }
   }, [columns, collectionName]);
 
   const persistColumnOrder = (order) => {
@@ -158,6 +167,24 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
   const resetColumnOrder = () => {
     persistColumnOrder(columns);
   };
+
+  const persistHiddenColumns = (set) => {
+    setHiddenColumns(set);
+    try {
+      localStorage.setItem(`columnHidden:${collectionName}`, JSON.stringify(Array.from(set)));
+    } catch (e) { /* ignore quota errors */ }
+  };
+
+  const toggleColumnVisibility = (col) => {
+    const next = new Set(hiddenColumns);
+    if (next.has(col)) next.delete(col); else next.add(col);
+    persistHiddenColumns(next);
+  };
+
+  const showAllColumns = () => persistHiddenColumns(new Set());
+  const hideAllColumns = () => persistHiddenColumns(new Set(columnOrder));
+
+  const visibleColumnOrder = columnOrder.filter((c) => !hiddenColumns.has(c));
 
   // Reset sort and selection when switching collections
   useEffect(() => {
@@ -477,9 +504,9 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
 
   if (loading) {
     return (
-      <div className="space-y-3">
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
+      <div className="border border-zinc-200 rounded-xl shadow-sm bg-white p-5 space-y-3">
+        {[...Array(6)].map((_, i) => (
+          <Skeleton key={i} className="h-10 w-full rounded-lg" />
         ))}
       </div>
     );
@@ -487,10 +514,23 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
 
   if (documents.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <p className="text-sm text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-          No documents found. Add your first document to get started.
+      <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-zinc-200 rounded-xl bg-white font-body">
+        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+          <Inbox className="w-5 h-5 text-primary" />
+        </div>
+        <p className="text-sm font-semibold text-zinc-800">No documents yet</p>
+        <p className="text-sm text-zinc-500 mt-1 max-w-xs">
+          Add your first document to {collectionName} to get started.
         </p>
+        {onAddDocument && (
+          <Button
+            onClick={onAddDocument}
+            className="mt-5 bg-primary text-white hover:bg-primary/90 rounded-lg px-5 shadow-sm shadow-primary/30"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Document
+          </Button>
+        )}
       </div>
     );
   }
@@ -509,21 +549,25 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
     return ordered;
   })();
 
+  const [currentSortField, currentSortDir] = sortBy.split('-');
+  const filteredColumnOrder = columnFilterText.trim()
+    ? columnOrder.filter((c) => c.toLowerCase().includes(columnFilterText.trim().toLowerCase()))
+    : columnOrder;
+
   return (
     <>
-      <div className="mb-4 space-y-4">
+      <div className="mb-4 space-y-4 font-body">
         {/* Search Bar with Algorithm Selector */}
         <div className="flex gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-400" />
             <Input
               data-testid="search-input"
               type="text"
               placeholder="Search with N-gram, Trigram & Phonetic algorithms..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10 rounded-none border-zinc-300 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]"
-              style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+              className="pl-10 pr-10 rounded-lg border-zinc-200 focus-visible:ring-primary"
             />
             {searchQuery && (
               <button
@@ -531,13 +575,13 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
                 onClick={() => setSearchQuery('')}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             )}
           </div>
-          
+
           <Select value={searchAlgorithm} onValueChange={setSearchAlgorithm}>
-            <SelectTrigger data-testid="algorithm-select" className="w-[200px] rounded-none">
+            <SelectTrigger data-testid="algorithm-select" className="w-[200px] rounded-lg">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -546,12 +590,12 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
             </SelectContent>
           </Select>
         </div>
-        
+
         {searchQuery && (
-          <div className="flex items-center justify-between text-sm" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+          <div className="flex items-center justify-between text-sm">
             <div className="text-zinc-600">
-              Found <span className="font-semibold text-[#002FA7]">{searchResults.length}</span> result{searchResults.length !== 1 ? 's' : ''} for "<span className="font-medium">{searchQuery}</span>"
-              <span className="ml-2 text-xs px-2 py-1 bg-zinc-100 text-zinc-600 rounded">
+              Found <span className="font-semibold text-primary">{searchResults.length}</span> result{searchResults.length !== 1 ? 's' : ''} for "<span className="font-medium">{searchQuery}</span>"
+              <span className="ml-2 text-xs px-2 py-1 bg-zinc-100 text-zinc-600 rounded-full">
                 {searchAlgorithm === 'advanced' ? '🧠 N-gram + Trigram + Phonetic' : '🔍 Fuzzy Match'}
               </span>
             </div>
@@ -560,97 +604,141 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
 
         {/* Sort Controls */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ArrowUpDown className="w-4 h-4 text-zinc-500" />
-            <span className="text-sm text-zinc-600" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>Sort by:</span>
-            <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger data-testid="sort-select" className="w-[200px] rounded-none">
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-zinc-500 flex-shrink-0" />
+            <span className="text-sm text-zinc-600 flex-shrink-0">Sort by:</span>
+            <Select
+              value={currentSortField}
+              onValueChange={(field) => setSortBy(`${field}-${currentSortDir}`)}
+            >
+              <SelectTrigger data-testid="sort-field-select" className="w-[180px] rounded-lg">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {sortableColumns.map(col => (
-                  <div key={col}>
-                    <SelectItem value={`${col}-desc`}>{col} (Newest first)</SelectItem>
-                    <SelectItem value={`${col}-asc`}>{col} (Oldest first)</SelectItem>
-                  </div>
+                  <SelectItem key={col} value={col}>{col}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <button
+              type="button"
+              data-testid="sort-direction-toggle"
+              onClick={() => setSortBy(`${currentSortField}-${currentSortDir === 'asc' ? 'desc' : 'asc'}`)}
+              className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-sm text-zinc-600 hover:bg-zinc-50 transition-colors"
+              title={currentSortDir === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {currentSortDir === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+              {currentSortDir === 'asc' ? 'Oldest first' : 'Newest first'}
+            </button>
           </div>
-          
+
           <div className="flex items-center gap-3">
             {selectedIds.size > 0 && (
               <Button
                 data-testid="bulk-delete-button"
                 variant="destructive"
-                className="rounded-none h-9"
-                style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+                className="rounded-lg h-9"
                 onClick={() => setBulkDeleteDialogOpen(true)}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Selected ({selectedIds.size})
               </Button>
             )}
-            <div className="text-sm text-zinc-600" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+            <div className="text-sm text-zinc-600">
               {searchQuery ? `Showing ${displayDocuments.length} of ${totalCount}` : `Showing ${documents.length} of ${totalCount} documents`}
             </div>
-            <Popover open={columnSettingsOpen} onOpenChange={setColumnSettingsOpen}>
+            <Popover open={columnSettingsOpen} onOpenChange={(open) => { setColumnSettingsOpen(open); if (!open) setColumnFilterText(''); }}>
               <PopoverTrigger asChild>
                 <Button
                   data-testid="columns-settings-button"
                   type="button"
                   variant="outline"
-                  className="rounded-none h-9 border-zinc-300"
-                  style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+                  className="rounded-lg h-9"
                 >
                   <Settings2 className="w-4 h-4 mr-2" />
                   Columns
+                  {hiddenColumns.size > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 text-[11px] font-mono bg-primary/10 text-primary rounded-full">
+                      {visibleColumnOrder.length}/{columnOrder.length}
+                    </span>
+                  )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 max-h-[420px] overflow-auto rounded-sm" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">Rearrange columns</div>
-                  <button
-                    type="button"
-                    onClick={resetColumnOrder}
-                    className="text-xs text-[#002FA7] hover:underline"
-                    data-testid="columns-reset"
-                  >
-                    Reset
-                  </button>
+              <PopoverContent align="end" className="w-80 p-0 rounded-lg font-body overflow-hidden">
+                <div className="p-3 border-b border-zinc-100 space-y-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" />
+                    <Input
+                      data-testid="columns-filter-input"
+                      value={columnFilterText}
+                      onChange={(e) => setColumnFilterText(e.target.value)}
+                      placeholder="Filter columns..."
+                      className="h-8 pl-8 rounded-md text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-500">{visibleColumnOrder.length} of {columnOrder.length} shown</span>
+                    <div className="flex items-center gap-3">
+                      <button type="button" onClick={showAllColumns} className="text-primary hover:underline" data-testid="columns-show-all">
+                        Show all
+                      </button>
+                      <button type="button" onClick={hideAllColumns} className="text-zinc-500 hover:underline" data-testid="columns-hide-all">
+                        Hide all
+                      </button>
+                      <button type="button" onClick={resetColumnOrder} className="text-zinc-500 hover:underline" data-testid="columns-reset">
+                        Reset order
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <ul className="space-y-1">
-                  {columnOrder.map((col, idx) => (
-                    <li
-                      key={col}
-                      data-testid={`column-row-${col}`}
-                      className="flex items-center justify-between gap-2 px-2 py-1.5 bg-zinc-50 hover:bg-zinc-100 rounded-sm"
-                    >
-                      <span className="text-sm text-zinc-800 truncate">{col}</span>
-                      <div className="flex items-center gap-1">
+                <ul className="max-h-[320px] overflow-y-auto p-2 space-y-1">
+                  {filteredColumnOrder.length === 0 && (
+                    <li className="text-sm text-zinc-400 text-center py-6">No columns match "{columnFilterText}"</li>
+                  )}
+                  {filteredColumnOrder.map((col) => {
+                    const idx = columnOrder.indexOf(col);
+                    const visible = !hiddenColumns.has(col);
+                    return (
+                      <li
+                        key={col}
+                        data-testid={`column-row-${col}`}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors ${visible ? 'bg-zinc-50 hover:bg-zinc-100' : 'bg-white hover:bg-zinc-50'}`}
+                      >
                         <button
                           type="button"
-                          data-testid={`column-up-${col}`}
-                          onClick={() => moveColumn(idx, -1)}
-                          disabled={idx === 0}
-                          className="h-6 w-6 inline-flex items-center justify-center text-zinc-600 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
-                          aria-label={`Move ${col} up`}
+                          data-testid={`column-toggle-${col}`}
+                          onClick={() => toggleColumnVisibility(col)}
+                          className={`h-6 w-6 inline-flex items-center justify-center flex-shrink-0 rounded ${visible ? 'text-primary' : 'text-zinc-300 hover:text-zinc-500'}`}
+                          aria-label={`${visible ? 'Hide' : 'Show'} ${col}`}
                         >
-                          <ArrowUp className="w-4 h-4" />
+                          {visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
-                        <button
-                          type="button"
-                          data-testid={`column-down-${col}`}
-                          onClick={() => moveColumn(idx, 1)}
-                          disabled={idx === columnOrder.length - 1}
-                          className="h-6 w-6 inline-flex items-center justify-center text-zinc-600 hover:text-[#002FA7] disabled:opacity-30 disabled:cursor-not-allowed"
-                          aria-label={`Move ${col} down`}
-                        >
-                          <ArrowDown className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </li>
-                  ))}
+                        <span className={`text-sm truncate flex-1 ${visible ? 'text-zinc-800' : 'text-zinc-400'}`}>{col}</span>
+                        <div className="flex items-center gap-0.5 flex-shrink-0">
+                          <button
+                            type="button"
+                            data-testid={`column-up-${col}`}
+                            onClick={() => moveColumn(idx, -1)}
+                            disabled={idx === 0}
+                            className="h-6 w-6 inline-flex items-center justify-center text-zinc-500 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                            aria-label={`Move ${col} up`}
+                          >
+                            <ArrowUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            data-testid={`column-down-${col}`}
+                            onClick={() => moveColumn(idx, 1)}
+                            disabled={idx === columnOrder.length - 1}
+                            className="h-6 w-6 inline-flex items-center justify-center text-zinc-500 hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                            aria-label={`Move ${col} down`}
+                          >
+                            <ArrowDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </PopoverContent>
             </Popover>
@@ -658,7 +746,7 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
         </div>
       </div>
 
-      <div className="border border-zinc-200 rounded-sm bg-white overflow-x-auto max-w-full">
+      <div className="border border-zinc-200 rounded-xl shadow-sm bg-white overflow-x-auto max-w-full">
         <Table>
           <TableHeader>
             <TableRow className="bg-zinc-50 hover:bg-zinc-50">
@@ -671,20 +759,20 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
                   className={someDisplaySelected && !allDisplaySelected ? 'opacity-50' : ''}
                 />
               </TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 sticky left-10 bg-zinc-50 z-10 w-16 text-center" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>#</TableHead>
-              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>ID</TableHead>
-              {columnOrder.map((col) => (
-                <TableHead key={col} className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500 sticky left-10 bg-zinc-50 z-10 w-16 text-center font-body">#</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500 font-body">ID</TableHead>
+              {visibleColumnOrder.map((col) => (
+                <TableHead key={col} className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500 whitespace-nowrap font-body">
                   {col}
                 </TableHead>
               ))}
-              <TableHead className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500 text-right sticky right-0 bg-zinc-50 z-10" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>Actions</TableHead>
+              <TableHead className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500 text-right sticky right-0 bg-zinc-50 z-10 font-body">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {displayDocuments.map((doc, index) => (
-              <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className={`hover:bg-zinc-50 ${selectedIds.has(doc.id) ? 'bg-blue-50' : ''}`}>
-                <TableCell className="sticky left-0 z-10 text-center" style={{ backgroundColor: selectedIds.has(doc.id) ? 'rgb(239 246 255)' : 'white' }}>
+              <TableRow key={doc.id} data-testid={`table-row-${doc.id}`} className={`hover:bg-zinc-50 transition-colors ${selectedIds.has(doc.id) ? 'bg-primary/5' : ''}`}>
+                <TableCell className="sticky left-0 z-10 text-center" style={{ backgroundColor: selectedIds.has(doc.id) ? 'hsl(var(--accent))' : 'white' }}>
                   <Checkbox
                     data-testid={`select-row-${doc.id}`}
                     checked={selectedIds.has(doc.id)}
@@ -692,20 +780,20 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
                     aria-label={`Select row ${index + 1}`}
                   />
                 </TableCell>
-                <TableCell className="font-semibold text-sm text-zinc-700 sticky left-10 z-10 text-center" style={{ backgroundColor: selectedIds.has(doc.id) ? 'rgb(239 246 255)' : 'white' }}>{index + 1}</TableCell>
+                <TableCell className="font-semibold text-sm text-zinc-700 sticky left-10 z-10 text-center" style={{ backgroundColor: selectedIds.has(doc.id) ? 'hsl(var(--accent))' : 'white' }}>{index + 1}</TableCell>
                 <TableCell className="font-mono text-xs text-zinc-600">{doc.id}</TableCell>
-                {columnOrder.map((col) => (
-                  <TableCell key={col} className="text-sm text-zinc-800 whitespace-nowrap" style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+                {visibleColumnOrder.map((col) => (
+                  <TableCell key={col} className="text-sm text-zinc-800 whitespace-nowrap font-body">
                     <CellValue value={doc[col]} columnName={col} />
                   </TableCell>
                 ))}
-                <TableCell className="text-right sticky right-0 z-10" style={{ backgroundColor: selectedIds.has(doc.id) ? 'rgb(239 246 255)' : 'white' }}>
+                <TableCell className="text-right sticky right-0 z-10" style={{ backgroundColor: selectedIds.has(doc.id) ? 'hsl(var(--accent))' : 'white' }}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         data-testid={`actions-menu-${doc.id}`}
                         variant="ghost"
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 rounded-lg"
                       >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
@@ -741,8 +829,8 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
             data-testid="load-more-button"
             onClick={loadMore}
             disabled={loadingMore}
-            className="bg-white text-zinc-900 border border-zinc-200 hover:bg-zinc-50 rounded-none px-8"
-            style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}
+            variant="outline"
+            className="rounded-lg px-8 font-body"
           >
             {loadingMore ? (
               <>
@@ -757,19 +845,19 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       )}
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-none">
+        <AlertDialogContent className="rounded-xl font-body">
           <AlertDialogHeader>
-            <AlertDialogTitle style={{ fontFamily: 'Chivo, sans-serif' }}>Confirm Delete</AlertDialogTitle>
-            <AlertDialogDescription style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+            <AlertDialogTitle className="font-heading">Confirm Delete</AlertDialogTitle>
+            <AlertDialogDescription>
               Are you sure you want to delete this document? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
             <AlertDialogAction
               data-testid="confirm-delete-button"
               onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700 text-white rounded-none"
+              className="bg-red-600 hover:bg-red-700 text-white rounded-lg"
             >
               Delete
             </AlertDialogAction>
@@ -778,19 +866,19 @@ export function DataTable({ collectionName, onEditDocument, onDocumentCountChang
       </AlertDialog>
 
       <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-none">
+        <AlertDialogContent className="rounded-xl font-body">
           <AlertDialogHeader>
-            <AlertDialogTitle style={{ fontFamily: 'Chivo, sans-serif' }}>Delete {selectedIds.size} Record{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
-            <AlertDialogDescription style={{ fontFamily: 'IBM Plex Sans, sans-serif' }}>
+            <AlertDialogTitle className="font-heading">Delete {selectedIds.size} Record{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
               You are about to permanently delete <span className="font-semibold text-zinc-900">{selectedIds.size} selected record{selectedIds.size !== 1 ? 's' : ''}</span>. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-none">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-lg">Cancel</AlertDialogCancel>
             <AlertDialogAction
               data-testid="confirm-bulk-delete-button"
               onClick={handleBulkDelete}
-              className="bg-red-600 hover:bg-red-700 text-white rounded-none"
+              className="bg-red-600 hover:bg-red-700 text-white rounded-lg"
             >
               Delete {selectedIds.size} Record{selectedIds.size !== 1 ? 's' : ''}
             </AlertDialogAction>
